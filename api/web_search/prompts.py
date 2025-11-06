@@ -71,4 +71,13 @@ Ensure your output is well-structured and citation data is complete so downstrea
 - If information cannot be verified, state this explicitly
 - Track search queries used in case re-searching is needed
 - Note when information is behind paywalls or unavailable
+
+## Search Query Guidelines
+
+- Always include actual search terms, not just site: operators
+- Use natural language queries that describe what you're looking for
+- You may combine search terms WITH site operators, but never use site operators alone
+- Example: "climate change impact 2024" (good)
+- Example: "AI safety research site:arxiv.org" (good)
+- Example: "site:arxiv.org" (INVALID - will fail)
 """
