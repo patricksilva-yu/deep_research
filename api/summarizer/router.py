@@ -1,19 +1,17 @@
+import logging
 from fastapi import APIRouter, HTTPException
 from pydantic_ai.exceptions import ModelHTTPError
 
 from .agents import summarizer_agent
 from .models import FinalReport, FinalReportInput
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/summarizer", tags=["summarizer"])
 
 
-class SummaryRequest(FinalReportInput):
-    """Request payload for generating a final research report."""
-    pass
-
-
 @router.post("/report", response_model=FinalReport)
-async def generate_report(request: SummaryRequest) -> FinalReport:
+async def generate_report(request: FinalReportInput) -> FinalReport:
     """Create a final research report from completed tasks and verification feedback."""
     try:
         # Convert BaseModel to JSON string for the agent
@@ -30,4 +28,7 @@ async def generate_report(request: SummaryRequest) -> FinalReport:
             )
         raise HTTPException(status_code=exc.status_code, detail=str(exc.body))
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Internal server error: {exc}")
+        # Log full exception details server-side for debugging
+        logger.exception("Unexpected error in summarizer endpoint")
+        # Return generic error message to client (no sensitive info)
+        raise HTTPException(status_code=500, detail="Internal server error")

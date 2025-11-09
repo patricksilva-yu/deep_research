@@ -1,9 +1,12 @@
+import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from pydantic_ai.exceptions import ModelHTTPError
 
 from .agents import code_execution_agent
 from .models import CodeExecutorOutput
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/code_executor", tags=["code_executor"])
 
@@ -30,4 +33,7 @@ async def execute_code(request: ExecutionRequest) -> CodeExecutorOutput:
             )
         raise HTTPException(status_code=exc.status_code, detail=str(exc.body))
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Internal server error: {exc}")
+        # Log full exception details server-side for debugging
+        logger.exception("Unexpected error in code execution endpoint")
+        # Return generic error message to client (no sensitive info)
+        raise HTTPException(status_code=500, detail="Internal server error")

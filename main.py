@@ -1,13 +1,12 @@
 from fastapi import FastAPI
-from api.web_search.router import router as web_search_router
 from api.orchestrator.router import router as orchestrator_router
 from api.code_executor.router import router as code_executor_router
 from api.summarizer.router import router as summarizer_router
 from api.verification.router import router as verification_router
 import logfire
 
-logfire.configure()  
-logfire.instrument_pydantic_ai() 
+logfire.configure()
+logfire.instrument_pydantic_ai()
 
 app = FastAPI(
     title="Deep Research API",
@@ -16,7 +15,6 @@ app = FastAPI(
 )
 
 # Include routers
-app.include_router(web_search_router)
 app.include_router(orchestrator_router)
 app.include_router(code_executor_router)
 app.include_router(summarizer_router)
@@ -28,7 +26,6 @@ async def root():
     return {
         "message": "Deep Research API",
         "endpoints": {
-            "web_search": "/web_search/search",
             "orchestrator": "/orchestrator/plan",
             "code_executor": "/code_executor/execute",
             "summarizer": "/summarizer/report",

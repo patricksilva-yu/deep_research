@@ -1,5 +1,6 @@
 from typing import Dict, List
-from pydantic_ai import Agent
+from dataclasses import dataclass, field
+from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.openai import OpenAIResponsesModelSettings
 from dotenv import load_dotenv
 
@@ -14,8 +15,19 @@ from .prompts import ORCHESTRATOR_INSTRUCTIONS
 
 load_dotenv()
 
-# Simple state: just track completed tasks
-_completed_tasks: Dict[str, dict] = {}
+
+@dataclass
+class OrchestratorState:
+    """Per-request state for orchestrator agent runs.
+
+    This class holds mutable state for a single orchestration run,
+    ensuring proper isolation between concurrent requests.
+
+    Attributes:
+        completed_tasks: Dictionary mapping task_id to task results.
+                        Each request gets its own isolated dictionary.
+    """
+    completed_tasks: Dict[str, dict] = field(default_factory=dict)
 
 model_settings = OpenAIResponsesModelSettings(
     openai_reasoning_effort='low',
@@ -24,6 +36,7 @@ model_settings = OpenAIResponsesModelSettings(
 
 orchestrator_agent = Agent(
     'openai-responses:gpt-5',
+    deps_type=OrchestratorState,
     instructions=ORCHESTRATOR_INSTRUCTIONS,
     output_type=OrchestratorOutput,
     retries=3,
@@ -31,22 +44,22 @@ orchestrator_agent = Agent(
 )
 
 
-@orchestrator_agent.tool_plain
-async def execute_search_task(task: ResearchTask) -> dict:
+@orchestrator_agent.tool
+async def execute_search_task(ctx: RunContext[OrchestratorState], task: ResearchTask) -> dict:
     """Execute a research task using the web search agent.
 
     This tool allows the orchestrator to delegate search tasks to the web search agent.
     Pass a ResearchTask with task_id, description, and search_query.
     """
     result = await web_search_agent.run(task.search_query)
+
+    # Use model_dump() and add task metadata
     task_result = {
         "task_id": task.task_id,
         "description": task.description,
-        "findings": result.output.findings,
-        "summary": result.output.summary,
-        "gaps": result.output.gaps
+        **result.output.model_dump()  # Spreads findings, summary, gaps, etc.
     }
-    _completed_tasks[task.task_id] = task_result
+    ctx.deps.completed_tasks[task.task_id] = task_result
     return task_result
 
 
@@ -69,28 +82,8 @@ async def verify_findings(content: str, sources: List[str]) -> dict:
 
     result = await verification_agent.run(verification_prompt)
 
-    verification_result = {
-        "overall_quality_rating": result.output.overall_quality_rating,
-        "approved_for_use": result.output.approved_for_use,
-        "source_assessments": [
-            {
-                "source_title": sa.source_title,
-                "credibility_rating": sa.credibility_rating,
-                "reasoning": sa.reasoning
-            }
-            for sa in result.output.source_assessments
-        ],
-        "consistency_issues": [
-            {
-                "severity": ci.severity,
-                "description": ci.description,
-                "suggested_action": ci.suggested_action
-            }
-            for ci in result.output.consistency_issues
-        ],
-        "critical_flags": result.output.critical_flags or [],
-        "improvement_priority": result.output.improvement_priority
-    }
+    # Use Pydantic's model_dump() to automatically convert model to dict
+    verification_result = result.output.model_dump()
 
     return verification_result
 
@@ -110,25 +103,14 @@ async def execute_code_task(task: str) -> dict:
     """
     result = await code_execution_agent.run(task)
 
-    code_result = {
-        "summary": result.output.summary,
-        "executions": [
-            {
-                "code": exec.code,
-                "output": exec.output,
-                "error": exec.error,
-                "execution_time": exec.execution_time
-            }
-            for exec in result.output.executions
-        ],
-        "next_steps": result.output.next_steps
-    }
+    # Use Pydantic's model_dump() to automatically convert model to dict
+    code_result = result.output.model_dump()
 
     return code_result
 
 
-@orchestrator_agent.tool_plain
-async def generate_final_report(mission: str, verification_results: dict = None) -> dict:
+@orchestrator_agent.tool
+async def generate_final_report(ctx: RunContext[OrchestratorState], mission: str, verification_results: dict = None) -> dict:
     """Generate a comprehensive final research report from all completed tasks.
 
     Use this tool as the FINAL step after executing all search tasks and verification.
@@ -144,7 +126,7 @@ async def generate_final_report(mission: str, verification_results: dict = None)
     """
     # Build completed task summaries from stored tasks
     completed_tasks = []
-    for task_id, task_data in _completed_tasks.items():
+    for task_id, task_data in ctx.deps.completed_tasks.items():
         completed_tasks.append(
             CompletedTaskSummary(
                 task_id=task_data["task_id"],
@@ -185,26 +167,7 @@ async def generate_final_report(mission: str, verification_results: dict = None)
     # Generate final report - convert to JSON string for the agent
     result = await summarizer_agent.run(report_input.model_dump_json(indent=2))
 
-    # Convert to dict for tool return
-    final_report = {
-        "mission": result.output.mission,
-        "executive_summary": result.output.executive_summary,
-        "sections": [
-            {
-                "title": section.title,
-                "summary": section.summary,
-                "supporting_points": section.supporting_points
-            }
-            for section in result.output.sections
-        ],
-        "recommended_actions": result.output.recommended_actions,
-        "quality_notes": result.output.quality_notes,
-        "sources": result.output.sources
-    }
+    # Use Pydantic's model_dump() to automatically convert model to dict
+    final_report = result.output.model_dump()
 
     return final_report
-
-
-def get_completed_tasks() -> Dict[str, dict]:
-    """Get all completed research tasks."""
-    return dict(_completed_tasks)
