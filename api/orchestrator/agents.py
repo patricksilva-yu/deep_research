@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Any
 from dataclasses import dataclass, field
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.openai import OpenAIResponsesModelSettings
@@ -27,7 +27,7 @@ class OrchestratorState:
         completed_tasks: Dictionary mapping task_id to task results.
                         Each request gets its own isolated dictionary.
     """
-    completed_tasks: Dict[str, dict] = field(default_factory=dict)
+    completed_tasks: Dict[str, Dict[str, Any]] = field(default_factory=dict)
 
 model_settings = OpenAIResponsesModelSettings(
     openai_reasoning_effort='low',
@@ -77,8 +77,8 @@ async def verify_findings(content: str, sources: List[str]) -> dict:
         Verification results including quality rating and issues found
     """
     # Construct verification prompt
-    verification_prompt = f"Please verify the following research content:\n\n{content}"
-    verification_prompt += f"\n\nSources cited:\n" + "\n".join(f"- {source}" for source in sources)
+    sources_list = "\n".join(f"- {source}" for source in sources)
+    verification_prompt = f"Please verify the following research content:\n\n{content}\n\nSources cited:\n{sources_list}"
 
     result = await verification_agent.run(verification_prompt)
 

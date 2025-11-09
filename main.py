@@ -28,22 +28,17 @@ async def model_http_error_handler(_request: Request, exc: ModelHTTPError) -> JS
     This centralizes error handling for all model-related HTTP errors,
     preventing information leakage by safely extracting error messages.
     """
+    # Safely extract the error message from the response body
     if exc.status_code == 429:
-        # Special handling for rate limit errors
-        error_message = exc.body.get('message', 'Rate limit error') if isinstance(exc.body, dict) else 'Rate limit error'
-        return JSONResponse(
-            status_code=429,
-            content={
-                "detail": f"Rate limit exceeded. Try again shortly. Details: {error_message}"
-            }
-        )
-
-    # For other HTTP errors, safely extract the error message
-    # Only extract 'message' field to avoid leaking sensitive information
-    if isinstance(exc.body, dict):
-        error_message = exc.body.get('message', 'An error occurred with the AI model')
+        default_message = 'Rate limit error'
     else:
-        error_message = 'An error occurred with the AI model'
+        default_message = 'An error occurred with the AI model'
+
+    error_message = exc.body.get('message', default_message) if isinstance(exc.body, dict) else default_message
+
+    if exc.status_code == 429:
+        detail = f"Rate limit exceeded. Try again shortly. Details: {error_message}"
+        return JSONResponse(status_code=429, content={"detail": detail})
 
     return JSONResponse(
         status_code=exc.status_code,

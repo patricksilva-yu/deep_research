@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 api_key = os.getenv("TAVILY_API_KEY")
+if not api_key:
+    raise RuntimeError("TAVILY_API_KEY environment variable not set.")
 
 model_settings = OpenAIResponsesModelSettings(
     openai_reasoning_effort='medium',
