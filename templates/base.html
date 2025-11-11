@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ title or "Hivemind – Deep Research" }}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="theme-dark">
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="{{ url_for('index') }}" class="brand-link">
+        <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Hivemind Logo" class="logo-large">
+      </a>
+      <nav class="nav">
+        <a href="{{ url_for('index') }}">Home</a>
+        <a href="{{ url_for('chat') }}">Chat</a>
+        <!-- <a href="{{ url_for('sign_in') }}" class="btn btn-ghost small">Sign in</a> -->
+      </nav>
+    </div>
+  </header>
+  <main id="app">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="site-footer">
+    <div class="container">
+      <p class="muted">© {{ current_year }} Hivemind. Deep research assistant.</p>
+    </div>
+  </footer>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

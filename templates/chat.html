@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="chat-wrapper">
+  <header class="chat-header">
+    <h1>Deep Research Chatbot</h1>
+    <p>Autonomous multi-agent conversation for research synthesis</p>
+  </header>
+
+  <div class="chat-container">
+    <div class="chat-messages" id="messages">
+      <div class="message bot">
+        Hello! I’m your Hivemind research assistant. What topic shall we explore today?
+      </div>
+    </div>
+  </div>
+
+  <form class="chat-input" id="chat-form">
+    <input id="chat-text" type="text" placeholder="Type your message..." autocomplete="off" />
+    <button type="submit">Send</button>
+  </form>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+{% endblock %}
