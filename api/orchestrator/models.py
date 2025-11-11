@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
+from api.summarizer.models import FinalReport
 
 
 class ResearchTask(BaseModel):
@@ -19,3 +20,7 @@ class ResearchPlan(BaseModel):
 class OrchestratorOutput(BaseModel):
     """Output from the orchestrator agent."""
     plan: ResearchPlan = Field(description="The research plan")
+    final_report: Optional[FinalReport] = Field(
+        default=None,
+        description="The final synthesized research report, generated after executing all tasks"
+    )

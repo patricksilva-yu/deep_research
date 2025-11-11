@@ -1,5 +1,6 @@
 import logging
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic_ai.exceptions import ModelHTTPError
 from api.orchestrator.router import router as orchestrator_router
@@ -17,6 +18,15 @@ app = FastAPI(
     title="Deep Research API",
     description="Multi-agent deep research system with web search, orchestration, code execution, and verification",
     version="0.1.0"
+)
+
+# Add CORS middleware to allow Flask frontend to call the API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5000", "http://127.0.0.1:5000"],  # Flask default ports
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
