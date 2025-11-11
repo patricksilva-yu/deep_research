@@ -1,6 +1,13 @@
+import datetime
+import os
+
 from flask import Flask, render_template
 
 app = Flask(__name__)
+
+@app.context_processor
+def inject_year():
+    return {"current_year": datetime.date.today().year}
 
 @app.route("/")
 def index():
@@ -16,4 +23,4 @@ def sign_in():
     return render_template("signin.html", title="Sign in – Hivemind")
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()

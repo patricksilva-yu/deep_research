@@ -19,29 +19,8 @@
     <button type="submit">Send</button>
   </form>
 </section>
+{% endblock %}
 
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-  const form = document.getElementById("chat-form");
-  const input = document.getElementById("chat-text");
-  const messages = document.getElementById("messages");
-  form.addEventListener("submit", function(e) {
-    e.preventDefault();
-    const text = (input.value || "").trim();
-    if (!text) return;
-    const bubble = document.createElement("div");
-    bubble.className = "message user";
-    bubble.textContent = text;
-    messages.appendChild(bubble);
-    input.value = "";
-    messages.scrollTop = messages.scrollHeight;
-    // placeholder assistant
-    const bot = document.createElement("div");
-    bot.className = "message bot";
-    bot.textContent = "…processing (Flask endpoint goes here)";
-    messages.appendChild(bot);
-    messages.scrollTop = messages.scrollHeight;
-  });
-});
-</script>
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 {% endblock %}
