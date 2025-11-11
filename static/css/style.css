@@ -1,0 +1,130 @@
+:root{
+  --bg:#0b0f14;
+  --text:#f6f7f9;
+  --muted:#9aa4b2;
+  --primary:#3b82f6;
+  --primary-600:#2563eb;
+  --card-border:rgba(255,255,255,0.08);
+  --card-hover:rgba(255,255,255,0.14);
+  --radius:16px;
+  --shadow:0 6px 30px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+/* body{
+  margin:0;
+  font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Noto Sans",sans-serif;
+  color:var(--text);
+  background:
+    radial-gradient(1200px 700px at 20% -10%, rgba(59,130,246,.15), transparent 60%),
+    radial-gradient(1200px 700px at 90% 20%, rgba(245,158,11,.12), transparent 60%),
+    #0b0f14;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+} */
+
+body {
+  margin: 0;
+  font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(1200px 700px at 20% -10%, rgba(59,130,246,.15), transparent 60%),
+    radial-gradient(1200px 700px at 90% 20%, rgba(245,158,11,.12), transparent 60%),
+    #0b0f14;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* 🐝 Honeycomb overlay */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: url("../img/honeycomb.webp") center / 600px repeat;
+  opacity: 0.05; /* tweak between 0.03–0.1 for visibility */
+  z-index: -1;
+  pointer-events: none;
+  mix-blend-mode: overlay; /* adds subtle blending with gradient */
+}
+
+.container{width:min(1100px,92vw); margin-inline:auto}
+.site-header{position:sticky; top:0; z-index:10; background:rgba(0,0,0,.25); backdrop-filter:blur(8px); border-bottom:1px solid rgba(255,255,255,0.08)}
+.header-inner{display:flex; align-items:center; justify-content:space-between; padding:14px 0}
+.brand{font-weight:800; letter-spacing:.5px}
+
+.nav a {
+  color: var(--text);
+  text-decoration: none;
+  margin-left: 20px;     /* more breathing room between links */
+  font-size: 24px;       /* increased text size */
+  font-weight: 600;      /* makes it stand out next to the logo */
+  opacity: 0.9;
+  transition: opacity 0.2s ease, color 0.3s ease;
+}
+
+.nav a:hover {
+  opacity: 1;
+  color: var(--primary); /* optional: adds a blue highlight on hover */
+}
+
+.hero{padding:96px 0 54px}
+.features{padding:36px 0 60px; border-top:1px solid rgba(255,255,255,0.08)}
+.section-title{text-align:center; font-size:clamp(22px,3vw,30px); margin:0 0 22px}
+
+.pill{display:inline-flex; align-items:center; gap:10px; padding:8px 14px; border-radius:999px; background:rgba(255,255,255,.06); border:1px solid var(--card-border); color:#d8dee7; font-weight:600; font-size:13px; margin-inline:auto; margin-bottom:22px}
+.pill-dot{width:6px; height:6px; border-radius:999px; background:#22c55e; box-shadow:0 0 10px #22c55e}
+.pill-sep{width:1px; height:14px; background:var(--card-border); display:inline-block}
+
+.headline{text-align:center; font-weight:800; line-height:1.05; letter-spacing:-.02em; margin:0 auto 18px; font-size:clamp(36px,6vw,72px); max-width:20ch}
+.gradient-text{background:linear-gradient(90deg,#3b82f6 0%,#7aa2ff 25%,#f59e0b 70%,#d97706 100%); -webkit-background-clip:text; background-clip:text; color:transparent}
+.subhead{text-align:center; color:var(--muted); font-size:clamp(16px,1.9vw,18px); line-height:1.7; margin:0 auto 28px; max-width:65ch}
+
+.btn{display:inline-flex; align-items:center; justify-content:center; gap:10px; text-decoration:none; font-weight:600; padding:12px 18px; border-radius:999px; border:1px solid transparent; transition:transform .08s ease, background .2s ease, border-color .2s ease}
+.btn:active{transform:translateY(1px)}
+.btn.small{padding:8px 12px; font-size:14px}
+.btn-primary{background:var(--primary); padding:20px 36px; font-size:18px; color:#fff; box-shadow:0 8px 24px rgba(59,130,246,.35)}
+.btn-primary:hover{background:var(--primary-600)}
+.btn-ghost{color:#dce2ea; border-color:var(--card-border); background:rgba(255,255,255,.02); border:1px solid var(--card-border)}
+.btn-ghost:hover{border-color:var(--card-hover); background:rgba(255,255,255,.04)}
+.arrow{display:inline-block; transform:translateY(1px)}
+.cta{display:flex; gap:12px; justify-content:center; align-items:center}
+
+.grid-2{display:grid; grid-template-columns:repeat(2,1fr); gap:16px}
+@media (max-width:860px){ .grid-2{grid-template-columns:1fr} }
+.feature{display:flex; gap:12px; align-items:flex-start; padding:14px 16px; border-radius:14px; border:1px solid var(--card-border); background:rgba(255,255,255,.03)}
+.check{width:28px; height:28px; display:grid; place-items:center; border-radius:999px; border:1px solid var(--card-border); background:rgba(255,255,255,.04)}
+
+.cta-block{padding:60px 0 100px; border-top:1px solid rgba(255,255,255,0.08); text-align:center}
+.headline.small{font-size:clamp(28px,4vw,44px)}
+
+.chat-wrapper{display:flex; flex-direction:column; min-height:100vh; background:linear-gradient(180deg,#0b0f14 0%,#111827 100%); color:var(--text)}
+.chat-header{text-align:center; padding:40px 20px 20px}
+.chat-header h1{font-size:clamp(28px,4vw,40px); font-weight:700; margin:0}
+.chat-header p{color:var(--muted); margin-top:8px}
+.chat-container{flex:1; display:flex; justify-content:center; padding:0 20px}
+.chat-messages{width:100%; max-width:800px; display:flex; flex-direction:column; gap:18px; padding:30px; overflow-y:auto; border-radius:var(--radius); background:rgba(255,255,255,0.04); border:1px solid var(--card-border); box-shadow:var(--shadow); backdrop-filter:blur(10px) saturate(130%)}
+.message{max-width:80%; padding:12px 16px; border-radius:14px; line-height:1.5; font-size:16px; white-space:pre-wrap}
+.message.bot{align-self:flex-start; background:rgba(59,130,246,0.15); border:1px solid rgba(59,130,246,0.3)}
+.message.user{align-self:flex-end; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15)}
+.chat-input{display:flex; justify-content:center; align-items:center; gap:10px; padding:18px 20px; border-top:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.3); position:sticky; bottom:0; backdrop-filter:blur(10px)}
+.chat-input input{flex:1; padding:12px 16px; border-radius:999px; border:1px solid var(--card-border); background:rgba(255,255,255,0.04); color:var(--text); font-size:16px; outline:none}
+.chat-input button{background:var(--primary); color:#fff; border:none; border-radius:999px; padding:12px 22px; font-weight:600; cursor:pointer; transition:background .2s}
+.chat-input button:hover{background:var(--primary-600)}
+
+.site-footer{padding:30px 0; border-top:1px solid rgba(255,255,255,0.08)}
+.muted{color:var(--muted); font-size:14px}
+
+.logo-large {
+  width: 200px;       /* bigger logo */
+  height: auto;
+  object-fit: contain;
+  border-radius: 0;   /* no rounded corners */
+  background: none;
+  transition: transform 0.2s ease;
+}
+
+.logo-large:hover {
+  transform: scale(1.05);
+}

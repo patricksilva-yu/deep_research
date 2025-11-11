@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="chat-wrapper">
+  <header class="chat-header">
+    <h1>Deep Research Chatbot</h1>
+    <p>Autonomous multi-agent conversation for research synthesis</p>
+  </header>
+
+  <div class="chat-container">
+    <div class="chat-messages" id="messages">
+      <div class="message bot">
+        Hello! I’m your Hivemind research assistant. What topic shall we explore today?
+      </div>
+    </div>
+  </div>
+
+  <form class="chat-input" id="chat-form">
+    <input id="chat-text" type="text" placeholder="Type your message..." autocomplete="off" />
+    <button type="submit">Send</button>
+  </form>
+</section>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const form = document.getElementById("chat-form");
+  const input = document.getElementById("chat-text");
+  const messages = document.getElementById("messages");
+  form.addEventListener("submit", function(e) {
+    e.preventDefault();
+    const text = (input.value || "").trim();
+    if (!text) return;
+    const bubble = document.createElement("div");
+    bubble.className = "message user";
+    bubble.textContent = text;
+    messages.appendChild(bubble);
+    input.value = "";
+    messages.scrollTop = messages.scrollHeight;
+    // placeholder assistant
+    const bot = document.createElement("div");
+    bot.className = "message bot";
+    bot.textContent = "…processing (Flask endpoint goes here)";
+    messages.appendChild(bot);
+    messages.scrollTop = messages.scrollHeight;
+  });
+});
+</script>
+{% endblock %}

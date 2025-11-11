@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="hero">
+  <div class="container">
+    <!-- <div class="pill">
+      <span class="pill-dot"></span>
+      New
+      <span class="pill-sep"></span>
+      Collective Intelligence for Deep Research
+    </div> -->
+
+    <h1 class="headline">
+      Deep Research Chatbot for
+      <span class="gradient-text">Collective Intelligence</span>
+    </h1>
+
+    <p class="subhead">
+      Join thousands using <strong>Hivemind</strong> for intelligent research synthesis and analysis.
+      Real-time web search, AI-powered source analysis, and structured report generation with citations.
+    </p>
+
+    <div class="cta">
+      <a class="btn btn-primary" href="{{ url_for('chat') }}">
+        Try Now <span class="arrow">→</span>
+      </a>
+      <!-- <a class="btn btn-ghost" href="{{ url_for('sign_in') }}">
+        Get Started Free
+      </a> -->
+    </div>
+  </div>
+</section>
+
+<section class="features">
+  <div class="container">
+    <h2 class="section-title">What you can do</h2>
+    <div class="grid-2">
+      <div class="feature"><div class="check">✓</div><div class="feature-text">Multi-source research synthesis</div></div><div class="feature"><div class="check">✓</div><div class="feature-text">Real-time web search capabilities</div></div><div class="feature"><div class="check">✓</div><div class="feature-text">AI-powered source analysis</div></div><div class="feature"><div class="check">✓</div><div class="feature-text">Structured report generation</div></div><div class="feature"><div class="check">✓</div><div class="feature-text">Citation tracking and management</div></div><div class="feature"><div class="check">✓</div><div class="feature-text">Conversation history and persistence</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="cta-block">
+  <div class="container">
+    <h2 class="headline small">Ready to dive into deep research?</h2>
+    <p class="subhead">Kick off a conversation and generate your first report in minutes.</p>
+    <!-- <a class="btn btn-primary" href="{{ url_for('chat') }}">Start a Chat</a> -->
+  </div>
+</section>
+
+{% endblock %}
