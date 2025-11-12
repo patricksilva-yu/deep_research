@@ -3,8 +3,8 @@ fastapi
 uvicorn[standard]
 pydantic
 python-dotenv
-flask
-gunicorn
+jinja2
+aiofiles
 
 # AI Agent Framework
 pydantic-ai
