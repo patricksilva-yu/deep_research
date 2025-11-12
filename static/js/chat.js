@@ -4,8 +4,10 @@
     const input = document.getElementById("chat-text");
     const messages = document.getElementById("messages");
 
-    // API endpoint - update this if your FastAPI runs on a different port
-    const API_URL = "http://localhost:8000/orchestrator/plan";
+    // API endpoint - use environment variable or default to localhost for development
+    const API_URL = window.location.hostname === "localhost"
+      ? "http://localhost:8000/orchestrator/plan"
+      : `${window.location.protocol}//${window.location.hostname}:8000/orchestrator/plan`;
 
     if (!form || !input || !messages) return;
 

@@ -28,6 +28,7 @@ app.add_middleware(
         "http://127.0.0.1:5000",
         "http://localhost:3000",  # Docker mapped port
         "http://127.0.0.1:3000",
+        "https://hivemind-deepresearch.fly.dev",  # Production Fly.io domain
     ],
     allow_credentials=True,
     allow_methods=["*"],
