@@ -1,0 +1,18 @@
+# Core Framework
+fastapi
+uvicorn[standard]
+pydantic
+python-dotenv
+flask
+gunicorn
+
+# AI Agent Framework
+pydantic-ai
+
+# Web Search & HTTP
+httpx
+tavily-python
+
+# Optional (for future deep_extract tool)
+# beautifulsoup4
+# playwright
