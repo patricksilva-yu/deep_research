@@ -2,10 +2,10 @@
 {% block content %}
 <section class="page">
   <div class="container" style="max-width: 500px; margin: 60px auto;">
-    <h1 class="headline">Sign In</h1>
-    <p class="subhead">Access your Hivemind deep research account</p>
+    <h1 class="headline">Create Account</h1>
+    <p class="subhead">Join Hivemind to start deep research</p>
 
-    <form id="loginForm" style="margin-top: 40px;">
+    <form id="registerForm" style="margin-top: 40px;">
       <div class="form-group">
         <label for="email">Email Address</label>
         <input
@@ -25,20 +25,35 @@
           id="password"
           name="password"
           required
-          placeholder="Enter your password"
+          minlength="8"
+          placeholder="At least 8 characters"
+          style="width: 100%; padding: 10px; margin-top: 8px; border: 1px solid #666; border-radius: 4px; font-size: 14px;"
+        />
+        <small style="color: #999; margin-top: 4px; display: block;">Minimum 8 characters required</small>
+      </div>
+
+      <div class="form-group" style="margin-top: 20px;">
+        <label for="confirmPassword">Confirm Password</label>
+        <input
+          type="password"
+          id="confirmPassword"
+          name="confirmPassword"
+          required
+          placeholder="Confirm password"
           style="width: 100%; padding: 10px; margin-top: 8px; border: 1px solid #666; border-radius: 4px; font-size: 14px;"
         />
       </div>
 
       <div id="errorMessage" style="color: #ff6b6b; margin-top: 16px; display: none;"></div>
+      <div id="successMessage" style="color: #51cf66; margin-top: 16px; display: none;"></div>
 
       <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 30px; padding: 12px;">
-        Sign In
+        Create Account
       </button>
     </form>
 
     <div style="text-align: center; margin-top: 30px;">
-      <p>Don't have an account? <a href="/register" style="color: #4dabf7; text-decoration: none;">Create one</a></p>
+      <p>Already have an account? <a href="/sign-in" style="color: #4dabf7; text-decoration: none;">Sign in</a></p>
     </div>
 
     <a href="/" class="btn btn-ghost" style="margin-top: 20px;">← Back to Home</a>
@@ -46,40 +61,56 @@
 </section>
 
 <script>
-  const form = document.getElementById('loginForm');
+  const form = document.getElementById('registerForm');
   const errorDiv = document.getElementById('errorMessage');
+  const successDiv = document.getElementById('successMessage');
+
+  // API backend URL from server-side template context
+  const API_BASE_URL = '{{ api_base_url }}';
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     errorDiv.style.display = 'none';
+    successDiv.style.display = 'none';
 
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+
+    // Validate passwords match
+    if (password !== confirmPassword) {
+      errorDiv.textContent = 'Passwords do not match';
+      errorDiv.style.display = 'block';
+      return;
+    }
 
     try {
-      // Use Flask endpoint which properly sets cookies on the Flask domain
-      const response = await fetch('/api/login', {
+      const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',  // Include cookies in cross-origin requests
         body: JSON.stringify({ email, password }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        errorDiv.textContent = data.detail || 'Sign in failed';
+        errorDiv.textContent = data.detail || 'Registration failed';
         errorDiv.style.display = 'block';
         return;
       }
 
-      // Successful login - redirect to chat
-      window.location.href = '/chat';
+      successDiv.textContent = 'Account created! Redirecting to sign in...';
+      successDiv.style.display = 'block';
+      setTimeout(() => {
+        window.location.href = '/sign-in';
+      }, 2000);
     } catch (error) {
       errorDiv.textContent = 'An error occurred. Please try again.';
       errorDiv.style.display = 'block';
-      console.error('Login error:', error);
+      console.error('Register error:', error);
     }
   });
 </script>

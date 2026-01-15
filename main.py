@@ -1,38 +1,97 @@
 import logging
-import datetime
+import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, HTMLResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic_ai.exceptions import ModelHTTPError
 from api.orchestrator.router import router as orchestrator_router
 from api.code_executor.router import router as code_executor_router
 from api.summarizer.router import router as summarizer_router
 from api.verification.router import router as verification_router
+from auth.router import router as auth_router
+from auth.database import init_db, close_db
+from auth.sessions import init_sessions, close_sessions
+from auth.csrf import verify_csrf_token
 import logfire
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
 logfire.configure()
 logfire.instrument_pydantic_ai()
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan context manager for startup and shutdown events.
+    Initializes database and session manager on startup.
+    Closes resources on shutdown.
+    """
+    # Startup
+    logger.info("Application starting up")
+    await init_db()
+    await init_sessions()
+    yield
+    # Shutdown
+    logger.info("Application shutting down")
+    await close_db()
+    await close_sessions()
+
+
 app = FastAPI(
     title="Deep Research API",
     description="Multi-agent deep research system with web search, orchestration, code execution, and verification",
-    version="0.1.0"
+    version="0.1.0",
+    lifespan=lifespan
 )
 
-# Setup templates
-templates = Jinja2Templates(directory="templates")
+# CORS configuration - allow Flask frontend to access the API
+frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+allowed_origins = [
+    frontend_url,
+    frontend_url.replace("localhost", "127.0.0.1"),
+]
 
-# Add context processor for templates
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,  # Required for cookies (session_id, csrf_token)
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "X-CSRF-Token"],
+    expose_headers=["Set-Cookie"],
+)
+
+# Exempt paths from CSRF protection
+CSRF_EXEMPT_PATHS = {"/auth/login", "/auth/register", "/health", "/api/webhooks"}
+
+# CSRF protection middleware
 @app.middleware("http")
-async def add_template_context(request: Request, call_next):
-    request.state.current_year = datetime.date.today().year
-    response = await call_next(request)
-    return response
+async def csrf_middleware(request: Request, call_next):
+    """
+    Verify CSRF token for state-changing requests (POST, PUT, PATCH, DELETE).
+    Only enforces when session_id cookie is present (cookie-authenticated requests).
+    """
+    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        session_id = request.cookies.get("session_id")
 
-# CORS no longer needed - FastAPI serves both frontend and API on the same origin
+        # Only enforce CSRF if request has a session cookie
+        if session_id and request.url.path not in CSRF_EXEMPT_PATHS:
+            cookie_token = request.cookies.get("csrf_token")
+            header_token = request.headers.get("X-CSRF-Token")
+
+            if not header_token or not cookie_token:
+                return JSONResponse(status_code=403, content={"detail": "CSRF token missing"})
+
+            csrf_secret = os.getenv("CSRF_SECRET")
+            if not verify_csrf_token(header_token, session_id, csrf_secret):
+                return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+
+    return await call_next(request)
+
 
 
 @app.exception_handler(ModelHTTPError)
@@ -79,41 +138,13 @@ async def generic_exception_handler(request: Request, _exc: Exception) -> JSONRe
     )
 
 # Include API routers
+app.include_router(auth_router)
 app.include_router(orchestrator_router)
 app.include_router(code_executor_router)
 app.include_router(summarizer_router)
 app.include_router(verification_router)
 
 
-# HTML Routes (formerly in Flask app.py)
-@app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request, "title": "Hivemind – Deep Research Chatbot", "current_year": request.state.current_year}
-    )
-
-
-@app.get("/chat", response_class=HTMLResponse)
-async def chat(request: Request):
-    return templates.TemplateResponse(
-        "chat.html",
-        {"request": request, "title": "Chat – Hivemind", "current_year": request.state.current_year}
-    )
-
-
-@app.get("/sign-in", response_class=HTMLResponse)
-async def sign_in(request: Request):
-    return templates.TemplateResponse(
-        "signin.html",
-        {"request": request, "title": "Sign in – Hivemind", "current_year": request.state.current_year}
-    )
-
-
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
-
-
-# Mount static files LAST (after all routes)
-app.mount("/static", StaticFiles(directory="static"), name="static")

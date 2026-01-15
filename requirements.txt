@@ -1,6 +1,8 @@
 # Core Framework
 fastapi
 uvicorn[standard]
+flask
+gunicorn
 pydantic
 python-dotenv
 jinja2
@@ -16,3 +18,9 @@ tavily-python
 # Optional (for future deep_extract tool)
 # beautifulsoup4
 # playwright
+
+# Database & Authentication
+asyncpg
+argon2-cffi
+upstash-redis
+python-multipart
