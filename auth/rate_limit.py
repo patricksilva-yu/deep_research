@@ -150,21 +150,17 @@ class RateLimiter:
         logger.info(f"Account unlocked: user {user_id}")
 
 
-# Global rate limiter instance
-_rate_limiter = None
-
-
-async def get_rate_limiter(redis: Redis) -> RateLimiter:
+def get_rate_limiter(redis: Redis) -> RateLimiter:
     """
-    Get or create the rate limiter instance.
+    Create a RateLimiter instance with the provided Redis client.
+
+    This function can be used as a FastAPI dependency or called directly.
+    The RateLimiter is lightweight and stateless - it only wraps the Redis client.
 
     Args:
-        redis: Upstash Redis client
+        redis: Upstash Redis client (should be singleton from app startup)
 
     Returns:
         RateLimiter instance
     """
-    global _rate_limiter
-    if _rate_limiter is None:
-        _rate_limiter = RateLimiter(redis)
-    return _rate_limiter
+    return RateLimiter(redis)

@@ -1,7 +1,7 @@
 # Core Framework
 fastapi
 uvicorn[standard]
-flask
+flask[async]  # Async support required for async before_request hooks
 gunicorn
 pydantic
 python-dotenv

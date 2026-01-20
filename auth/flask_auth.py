@@ -2,8 +2,10 @@
 Flask authentication integration.
 Provides before_request hook, login_required decorator, and g.user object.
 Uses Upstash Redis for session management (same as FastAPI).
+
+Note: Flask 2.0+ provides native async support for before_request hooks and views.
+This eliminates the need for creating new event loops on every request.
 """
-import asyncio
 import logging
 import os
 from functools import wraps
@@ -58,36 +60,40 @@ async def _get_user_from_session_async(session_id: str, csrf_token: str = None):
     return None
 
 
+async def _refresh_session_async(session_id: str):
+    """Refresh session TTL. Called after successful session verification."""
+    session_manager = get_session_manager()
+    try:
+        await session_manager.refresh_session(session_id)
+    except Exception as e:
+        logger.warning(f"Failed to refresh session: {e}")
+
+
 def init_auth(app):
 
     @app.before_request
-    def check_session():
+    async def check_session():
+        """
+        Async before_request hook for Flask 2.0+.
+
+        This eliminates the need for creating new event loops on every request.
+        Flask automatically manages the event loop for async before_request hooks.
+        """
         g.user = None
         session_id = request.cookies.get("session_id")
         csrf_token = request.cookies.get("csrf_token")
 
         if session_id:
-            # Run async function in sync context
             try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                user = loop.run_until_complete(_get_user_from_session_async(session_id, csrf_token))
-                loop.close()
+                # Directly await the async function - Flask handles the event loop
+                user = await _get_user_from_session_async(session_id, csrf_token)
 
                 if user:
                     g.user = user
                     g.session_id = session_id
 
-                    # Refresh session TTL in background
-                    # (Simple approach - proper implementation would use task queue)
-                    session_manager = get_session_manager()
-                    try:
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        loop.run_until_complete(session_manager.refresh_session(session_id))
-                        loop.close()
-                    except Exception as e:
-                        logger.warning(f"Failed to refresh session: {e}")
+                    # Refresh session TTL - also awaited directly
+                    await _refresh_session_async(session_id)
             except Exception as e:
                 logger.warning(f"Session check failed: {e}")
                 g.user = None

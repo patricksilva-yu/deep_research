@@ -15,6 +15,7 @@ from auth.security import hash_password, verify_password
 from auth.sessions import get_session_manager
 from auth.csrf import generate_csrf_token
 from auth.rate_limit import get_rate_limiter
+from auth.redis_client import get_redis_client
 from auth.dependencies import get_current_user, CurrentUser
 from upstash_redis.asyncio import Redis
 
@@ -89,6 +90,7 @@ async def login(
     req: LoginRequest,
     request: Request,
     db = Depends(get_db),
+    redis: Annotated[Redis, Depends(get_redis_client)] = None,
 ):
     """
     Authenticate user and create session.
@@ -97,6 +99,7 @@ async def login(
         req: Login request with email and password
         request: FastAPI request object (for client IP)
         db: Database connection
+        redis: Redis client (injected dependency)
 
     Returns:
         JSONResponse with session and CSRF cookies
@@ -106,9 +109,8 @@ async def login(
     """
     client_ip = request.client.host
 
-    # Initialize Redis and rate limiter
-    redis = Redis.from_env()
-    rate_limiter = await get_rate_limiter(redis)
+    # Initialize rate limiter with injected Redis client
+    rate_limiter = get_rate_limiter(redis)
 
     # Check rate limits
     if await rate_limiter.check_ip_rate_limit(client_ip):

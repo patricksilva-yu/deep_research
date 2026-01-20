@@ -1,6 +1,8 @@
 import datetime
 import os
 import httpx
+import asyncio
+import logging
 from dotenv import load_dotenv
 
 from flask import Flask, render_template, redirect, url_for, g, request, jsonify, make_response
@@ -8,7 +10,25 @@ from auth.flask_auth import init_auth, login_required
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 app = Flask(__name__)
+
+# Initialize Redis and session manager
+async def init_app():
+    """Initialize async components (Redis, sessions)."""
+    from auth.redis_client import init_redis
+    from auth.sessions import init_sessions
+
+    await init_redis()
+    await init_sessions()
+
+# Run initialization
+try:
+    asyncio.run(init_app())
+except Exception as e:
+    logger.critical(f"Failed to initialize app: {e}")
+    raise
 
 # Initialize authentication
 init_auth(app)
@@ -45,6 +65,38 @@ def register():
     if g.get("user"):
         return redirect(url_for("chat"))
     return render_template("register.html", title="Register – Hivemind")
+
+@app.route("/api/register", methods=["POST"])
+def api_register():
+    """
+    Flask registration endpoint that relays to FastAPI.
+    """
+    data = request.get_json()
+    email = data.get("email")
+    password = data.get("password")
+
+    if not email or not password:
+        return jsonify({"detail": "Missing email or password"}), 400
+
+    try:
+        # Call FastAPI register endpoint
+        response = httpx.post(
+            f"{API_BASE_URL}/auth/register",
+            json={"email": email, "password": password},
+            timeout=10
+        )
+
+        if response.status_code != 200:
+            error_data = response.json()
+            return jsonify(error_data), response.status_code
+
+        # Return success response
+        return jsonify(response.json()), 200
+
+    except Exception as e:
+        logger.error(f"Registration failed: {e}")
+        return jsonify({"detail": "Registration failed"}), 500
+
 
 @app.route("/api/login", methods=["POST"])
 def api_login():
@@ -89,7 +141,8 @@ def api_login():
         return flask_response
 
     except Exception as e:
-        return jsonify({"detail": f"Login failed: {str(e)}"}), 500
+        logger.error(f"Login failed: {e}")
+        return jsonify({"detail": "Login failed"}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3000)

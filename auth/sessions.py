@@ -20,18 +20,15 @@ class UpstashSessionManager:
     Sessions store user_id and metadata with configurable TTL.
     """
 
-    def __init__(self):
-        self.redis_url = os.getenv("UPSTASH_REDIS_REST_URL")
-        self.redis_token = os.getenv("UPSTASH_REDIS_REST_TOKEN")
+    def __init__(self, redis: Redis):
+        """
+        Initialize session manager with a Redis client.
+
+        Args:
+            redis: Upstash Redis client instance (should be singleton from app startup)
+        """
+        self.redis = redis
         self.session_ttl = int(os.getenv("SESSION_TTL", "86400"))  # 24 hours default
-
-        if not self.redis_url or not self.redis_token:
-            raise ValueError(
-                "UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN must be set"
-            )
-
-        # Initialize async Redis client
-        self.redis = Redis(url=self.redis_url, token=self.redis_token)
 
     @redis_retry(max_retries=3, initial_delay=0.5)
     async def _setex_with_retry(self, key: str, ttl: int, value: str) -> None:
@@ -148,17 +145,34 @@ _session_manager: Optional[UpstashSessionManager] = None
 
 
 def get_session_manager() -> UpstashSessionManager:
-    """Get the global session manager instance."""
+    """
+    Get the global session manager instance.
+
+    Returns:
+        The global session manager instance
+
+    Raises:
+        RuntimeError: If session manager not initialized (app startup failed)
+    """
     global _session_manager
     if _session_manager is None:
-        _session_manager = UpstashSessionManager()
+        raise RuntimeError(
+            "Session manager not initialized. Ensure init_sessions() is called during application startup."
+        )
     return _session_manager
 
 
 async def init_sessions() -> None:
-    """Initialize the session manager (called at app startup)."""
+    """
+    Initialize the session manager (called at app startup).
+
+    This must be called after init_redis() since it depends on the Redis client.
+    """
     global _session_manager
-    _session_manager = UpstashSessionManager()
+    from auth.redis_client import get_redis_client
+
+    redis = get_redis_client()
+    _session_manager = UpstashSessionManager(redis=redis)
     logger.info("Session manager initialized")
 
 

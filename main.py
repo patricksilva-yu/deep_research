@@ -12,6 +12,7 @@ from api.verification.router import router as verification_router
 from auth.router import router as auth_router
 from auth.database import init_db, close_db
 from auth.sessions import init_sessions, close_sessions
+from auth.redis_client import init_redis, close_redis
 from auth.csrf import verify_csrf_token
 import logfire
 from dotenv import load_dotenv
@@ -28,18 +29,20 @@ logfire.instrument_pydantic_ai()
 async def lifespan(app: FastAPI):
     """
     Lifespan context manager for startup and shutdown events.
-    Initializes database and session manager on startup.
+    Initializes database, Redis client, and session manager on startup.
     Closes resources on shutdown.
     """
     # Startup
     logger.info("Application starting up")
     await init_db()
+    await init_redis()  # Initialize Redis client before sessions (sessions will use it)
     await init_sessions()
     yield
     # Shutdown
     logger.info("Application shutting down")
     await close_db()
     await close_sessions()
+    await close_redis()
 
 
 app = FastAPI(
