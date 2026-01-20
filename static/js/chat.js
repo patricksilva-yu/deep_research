@@ -4,8 +4,9 @@
     const input = document.getElementById("chat-text");
     const messages = document.getElementById("messages");
 
-    // API endpoint - same origin (FastAPI serves both frontend and API)
-    const API_URL = `${window.location.origin}/orchestrator/plan`;
+    // API backend URL from page meta tag or fall back to default
+    const API_BASE_URL = document.documentElement.getAttribute('data-api-base-url') || 'http://localhost:8000';
+    const API_URL = `${API_BASE_URL}/orchestrator/plan`;
 
     if (!form || !input || !messages) return;
 
@@ -148,6 +149,20 @@
       return html;
     }
 
+    async function getCsrfToken() {
+      // Extract CSRF token from cookies
+      const name = "csrf_token=";
+      const decodedCookie = decodeURIComponent(document.cookie);
+      const cookieArray = decodedCookie.split(';');
+      for (let cookie of cookieArray) {
+        cookie = cookie.trim();
+        if (cookie.indexOf(name) === 0) {
+          return cookie.substring(name.length);
+        }
+      }
+      return null;
+    }
+
     async function submitQuery(query) {
       const submitButton = form.querySelector('button[type="submit"]');
       const originalButtonText = submitButton.textContent;
@@ -175,11 +190,18 @@
         `;
         const statusMsg = addMessage(loadingHTML, "bot loading");
 
+        const csrfToken = getCsrfToken();
+        const headers = {
+          "Content-Type": "application/json",
+        };
+        if (csrfToken) {
+          headers["X-CSRF-Token"] = csrfToken;
+        }
+
         const response = await fetch(API_URL, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: headers,
+          credentials: 'include',  // Include cookies in cross-origin requests
           body: JSON.stringify({ query: query }),
         });
 

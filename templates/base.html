@@ -15,9 +15,67 @@
       </a>
       <nav class="nav">
         <a href="/">Home</a>
-        <a href="/chat">Chat</a>
-        <!-- <a href="/sign-in" class="btn btn-ghost small">Sign in</a> -->
+        <a href="/chat" id="chat-link">Chat</a>
+        <div id="auth-buttons">
+          <a href="/sign-in" class="btn btn-ghost small">Sign in</a>
+          <a href="/register" class="btn btn-primary small">Sign up</a>
+        </div>
+        <div id="user-menu" style="display: none;">
+          <span id="user-email"></span>
+          <button id="logout-btn" class="btn btn-ghost small">Logout</button>
+        </div>
       </nav>
+      <script>
+        // API URL from server-side template context
+        const API_BASE_URL = '{{ api_base_url }}';
+
+        // Check if user is logged in on page load
+        async function checkAuth() {
+          try {
+            const response = await fetch(`${API_BASE_URL}/auth/me`, {
+              credentials: 'include'
+            });
+            if (response.ok) {
+              const data = await response.json();
+              // User is logged in
+              document.getElementById('auth-buttons').style.display = 'none';
+              document.getElementById('user-menu').style.display = 'block';
+              document.getElementById('user-email').textContent = data.email;
+
+              // Enable chat link
+              document.getElementById('chat-link').style.opacity = '1';
+            } else {
+              // User not logged in
+              document.getElementById('auth-buttons').style.display = 'block';
+              document.getElementById('user-menu').style.display = 'none';
+            }
+          } catch (error) {
+            console.error('Auth check failed:', error);
+            document.getElementById('auth-buttons').style.display = 'block';
+            document.getElementById('user-menu').style.display = 'none';
+          }
+        }
+
+        // Logout handler
+        document.getElementById('logout-btn').addEventListener('click', async (e) => {
+          e.preventDefault();
+          try {
+            await fetch(`${API_BASE_URL}/auth/logout`, {
+              method: 'POST',
+              credentials: 'include',
+              headers: {
+                'X-CSRF-Token': document.cookie.split('; ').find(row => row.startsWith('csrf_token='))?.split('=')[1] || ''
+              }
+            });
+            window.location.href = '/';
+          } catch (error) {
+            console.error('Logout failed:', error);
+          }
+        });
+
+        // Check auth on page load
+        checkAuth();
+      </script>
     </div>
   </header>
   <main id="app">
