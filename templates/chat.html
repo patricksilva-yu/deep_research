@@ -1,26 +1,80 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="chat-wrapper">
-  <header class="chat-header">
-    <h1>Deep Research Chatbot</h1>
-    <p>Autonomous multi-agent conversation for research synthesis</p>
-  </header>
+  <div class="chat-layout">
+    
+    <aside class="chat-sidebar">
+      <div class="sidebar-logo">
+        <img src="/static/img/logo.png" alt="Hivemind Logo" class="sidebar-logo-img">
+        <span class="sidebar-logo-text">Hivemind</span>
+      </div>
+      <div class="sidebar-header">
+        <button class="btn-new-chat" id="new-chat-btn">
+          <span>+</span> New chat
+        </button>
+      </div>
+      <div class="conversation-list" id="conversation-list">
+        </div>
+    </aside>
 
-  <div class="chat-container">
-    <div class="chat-messages" id="messages">
-      <div class="message bot">
-        Hello! I’m your Hivemind research assistant. What topic shall we explore today?
+    <div class="chat-main">
+      <div class="chat-empty-state" id="chat-empty-state">
+        <h2 class="empty-prompt">What's on your mind today?</h2>
+      </div>
+
+      <div class="chat-container" id="chat-container" style="display: none;">
+        <div class="chat-messages" id="messages">
+          </div>
+      </div>
+
+      <div class="chat-input-wrapper">
+        <form class="chat-input" id="chat-form">
+          <div class="input-container">
+            <span class="input-icon">+</span>
+            <input id="chat-text" type="text" placeholder="Ask anything" autocomplete="off" />
+            <button type="submit" class="send-button">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 19V5M12 5L5 12M12 5L19 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
-
-  <form class="chat-input" id="chat-form">
-    <input id="chat-text" type="text" placeholder="Type your message..." autocomplete="off" />
-    <button type="submit">Send</button>
-  </form>
 </section>
+
+<div class="context-menu" id="context-menu">
+  <button class="menu-item" data-action="rename"><span>✏️</span> Rename</button>
+  <button class="menu-item" data-action="share"><span>🔗</span> Share</button>
+  <button class="menu-item" data-action="delete"><span>🗑️</span> Delete</button>
+</div>
+
+<div class="modal-overlay" id="rename-modal">
+  <div class="modal">
+    <h3>Rename Conversation</h3>
+    <input type="text" id="rename-input" placeholder="Enter new name..." />
+    <div class="modal-actions">
+      <button class="btn-cancel" id="rename-cancel">Cancel</button>
+      <button class="btn-confirm" id="rename-confirm">Save</button>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
+<script>
+  // This script forces the page to be full-height and hides the standard header/footer
+  document.addEventListener('DOMContentLoaded', function() {
+    const app = document.getElementById('app');
+    if (app) {
+      app.style.padding = '0';
+      app.style.margin = '0';
+      app.style.height = '100vh';
+      app.style.overflow = 'hidden';
+    }
+    document.body.style.overflow = 'hidden';
+  });
+</script>
 <script src="/static/js/chat.js"></script>
 {% endblock %}
