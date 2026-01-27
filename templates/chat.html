@@ -4,16 +4,39 @@
   <div class="chat-layout">
     
     <aside class="chat-sidebar">
-      <div class="sidebar-logo">
+      <a href="/" class="sidebar-logo-link">
         <img src="/static/img/logo.png" alt="Hivemind Logo" class="sidebar-logo-img">
         <span class="sidebar-logo-text">Hivemind</span>
-      </div>
+      </a>
+
       <div class="sidebar-header">
         <button class="btn-new-chat" id="new-chat-btn">
           <span>+</span> New chat
         </button>
       </div>
+
       <div class="conversation-list" id="conversation-list">
+        <div class="conversation-section-header">Today</div>
+        <div class="conversation-item active">
+          <div class="conv-title">Research: Drone Regulations</div>
+          <button class="conv-menu-btn">⋯</button>
+        </div>
+        
+        <div class="conversation-section-header">Yesterday</div>
+        <div class="conversation-item">
+          <div class="conv-title">Market Analysis 2026</div>
+          <button class="conv-menu-btn">⋯</button>
+        </div>
+        <div class="conversation-item">
+          <div class="conv-title">Python Script Debugging</div>
+          <button class="conv-menu-btn">⋯</button>
+        </div>
+
+        <div class="conversation-section-header">Previous 7 Days</div>
+        <div class="conversation-item">
+          <div class="conv-title">Competitor Overview</div>
+          <button class="conv-menu-btn">⋯</button>
+        </div>
         </div>
     </aside>
 
@@ -33,9 +56,7 @@
             <span class="input-icon">+</span>
             <input id="chat-text" type="text" placeholder="Ask anything" autocomplete="off" />
             <button type="submit" class="send-button">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 19V5M12 5L5 12M12 5L19 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
+              🐝
             </button>
           </div>
         </form>
@@ -64,8 +85,8 @@
 
 {% block extra_scripts %}
 <script>
-  // This script forces the page to be full-height and hides the standard header/footer
   document.addEventListener('DOMContentLoaded', function() {
+    // Layout fixes
     const app = document.getElementById('app');
     if (app) {
       app.style.padding = '0';
