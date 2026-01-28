@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="chat-wrapper">
+
+<section class="chat-wrapper" data-api-base-url="{{ api_base_url }}">
   <div class="chat-layout">
-    
+
     <aside class="chat-sidebar">
       <a href="/" class="sidebar-logo-link">
         <img src="/static/img/logo.png" alt="Hivemind Logo" class="sidebar-logo-img">
@@ -21,7 +22,7 @@
           <div class="conv-title">Research: Drone Regulations</div>
           <button class="conv-menu-btn">⋯</button>
         </div>
-        
+
         <div class="conversation-section-header">Yesterday</div>
         <div class="conversation-item">
           <div class="conv-title">Market Analysis 2026</div>
@@ -37,7 +38,7 @@
           <div class="conv-title">Competitor Overview</div>
           <button class="conv-menu-btn">⋯</button>
         </div>
-        </div>
+      </div>
     </aside>
 
     <div class="chat-main">
@@ -46,8 +47,7 @@
       </div>
 
       <div class="chat-container" id="chat-container" style="display: none;">
-        <div class="chat-messages" id="messages">
-          </div>
+        <div class="chat-messages" id="messages"></div>
       </div>
 
       <div class="chat-input-wrapper">
@@ -55,13 +55,12 @@
           <div class="input-container">
             <span class="input-icon">+</span>
             <input id="chat-text" type="text" placeholder="Ask anything" autocomplete="off" />
-            <button type="submit" class="send-button">
-              🐝
-            </button>
+            <button type="submit" class="send-button">🐝</button>
           </div>
         </form>
       </div>
     </div>
+
   </div>
 </section>
 
