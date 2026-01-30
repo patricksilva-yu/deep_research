@@ -1,7 +1,6 @@
 import datetime
 import os
 import httpx
-import asyncio
 import logging
 from dotenv import load_dotenv
 
@@ -14,23 +13,7 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# Initialize Redis and session manager
-async def init_app():
-    """Initialize async components (Redis, sessions)."""
-    from auth.redis_client import init_redis
-    from auth.sessions import init_sessions
-
-    await init_redis()
-    await init_sessions()
-
-# Run initialization
-try:
-    asyncio.run(init_app())
-except Exception as e:
-    logger.critical(f"Failed to initialize app: {e}")
-    raise
-
-# Initialize authentication
+# Initialize authentication (which sets up before_request hooks)
 init_auth(app)
 
 # API Configuration

@@ -138,19 +138,9 @@ async def get_redis_with_retry(
             "UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN environment variables must be set"
         )
 
-    async def _create_redis() -> Redis:
-        # Test the connection by creating and immediately testing the client
-        redis = Redis(url=redis_url, token=redis_token)
-        # Verify connection works
-        await redis.ping()
-        return redis
-
-    try:
-        return await exponential_backoff_retry(
-            _create_redis,
-            max_retries=max_retries,
-            initial_delay=initial_delay,
-        )
-    except RedisConnectionError as e:
-        logger.error(f"Failed to establish Redis connection: {e}")
-        raise
+    # For Upstash Redis (HTTP-based), we don't need to test the connection during initialization.
+    # The client handles connection lazily, and testing it here can cause event loop binding issues.
+    # The client will discover connection problems on first actual use.
+    redis = Redis(url=redis_url, token=redis_token)
+    logger.info("Redis client created (connection will be tested on first use)")
+    return redis

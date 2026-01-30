@@ -9,7 +9,6 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 import logging
 from upstash_redis.asyncio import Redis
-from auth.redis_utils import redis_retry, exponential_backoff_retry
 
 logger = logging.getLogger(__name__)
 
@@ -25,15 +24,10 @@ class UpstashSessionManager:
         Initialize session manager with a Redis client.
 
         Args:
-            redis: Upstash Redis client instance (should be singleton from app startup)
+            redis: Upstash Redis client instance (fresh per request for Flask)
         """
         self.redis = redis
         self.session_ttl = int(os.getenv("SESSION_TTL", "86400"))  # 24 hours default
-
-    @redis_retry(max_retries=3, initial_delay=0.5)
-    async def _setex_with_retry(self, key: str, ttl: int, value: str) -> None:
-        """Helper for setex with retry."""
-        await self.redis.setex(key, ttl, value)
 
     async def create_session(self, user_id: int) -> str:
         """
@@ -52,9 +46,9 @@ class UpstashSessionManager:
             "created_at": datetime.utcnow().isoformat(),
         }
 
-        # Store in Redis with TTL (EX = expire in seconds) with retry logic
+        # Store in Redis with TTL (EX = expire in seconds)
         try:
-            await self._setex_with_retry(
+            await self.redis.setex(
                 f"session:{session_id}",
                 self.session_ttl,
                 json.dumps(session_data),
@@ -65,11 +59,6 @@ class UpstashSessionManager:
 
         logger.info(f"Created session {session_id} for user {user_id}")
         return session_id
-
-    @redis_retry(max_retries=3, initial_delay=0.5)
-    async def _get_with_retry(self, key: str) -> Optional[str]:
-        """Helper for get with retry."""
-        return await self.redis.get(key)
 
     async def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -82,7 +71,7 @@ class UpstashSessionManager:
             Session dict with user_id and created_at, or None if not found
         """
         try:
-            result = await self._get_with_retry(f"session:{session_id}")
+            result = await self.redis.get(f"session:{session_id}")
         except Exception as e:
             logger.error(f"Failed to retrieve session {session_id}: {e}")
             return None
@@ -96,11 +85,6 @@ class UpstashSessionManager:
             logger.error(f"Failed to decode session data for {session_id}")
             return None
 
-    @redis_retry(max_retries=3, initial_delay=0.5)
-    async def _delete_with_retry(self, key: str) -> None:
-        """Helper for delete with retry."""
-        await self.redis.delete(key)
-
     async def delete_session(self, session_id: str) -> None:
         """
         Delete a session (logout).
@@ -109,16 +93,11 @@ class UpstashSessionManager:
             session_id: Session ID
         """
         try:
-            await self._delete_with_retry(f"session:{session_id}")
+            await self.redis.delete(f"session:{session_id}")
         except Exception as e:
             logger.error(f"Failed to delete session {session_id}: {e}")
             raise
         logger.info(f"Deleted session {session_id}")
-
-    @redis_retry(max_retries=3, initial_delay=0.5)
-    async def _expire_with_retry(self, key: str, ttl: int) -> int:
-        """Helper for expire with retry."""
-        return await self.redis.expire(key, ttl)
 
     async def refresh_session(self, session_id: str) -> bool:
         """
@@ -133,42 +112,55 @@ class UpstashSessionManager:
         """
         try:
             # EXPIRE returns 1 if key exists, 0 if not
-            result = await self._expire_with_retry(f"session:{session_id}", self.session_ttl)
+            result = await self.redis.expire(f"session:{session_id}", self.session_ttl)
             return bool(result)
         except Exception as e:
             logger.error(f"Failed to refresh session {session_id}: {e}")
             return False
 
 
-# Global session manager instance
+# Global session manager instance (for FastAPI singleton pattern)
 _session_manager: Optional[UpstashSessionManager] = None
 
 
 def get_session_manager() -> UpstashSessionManager:
     """
-    Get the global session manager instance.
+    Get a session manager instance.
+
+    For FastAPI: Returns the singleton session manager
+    For Flask: Creates a new session manager with a new Redis client
 
     Returns:
-        The global session manager instance
+        A session manager instance
 
     Raises:
-        RuntimeError: If session manager not initialized (app startup failed)
+        ValueError: If Redis credentials not configured
     """
     global _session_manager
-    if _session_manager is None:
-        raise RuntimeError(
-            "Session manager not initialized. Ensure init_sessions() is called during application startup."
-        )
-    return _session_manager
+
+    # For FastAPI (singleton pattern)
+    if _session_manager is not None:
+        return _session_manager
+
+    # For Flask (per-request pattern) - create new session manager with new Redis client
+    from auth.redis_client import get_redis_client
+    redis = get_redis_client()
+    return UpstashSessionManager(redis=redis)
 
 
 async def init_sessions() -> None:
     """
-    Initialize the session manager (called at app startup).
+    Initialize the session manager for FastAPI (singleton pattern).
 
+    For Flask, this is a no-op since Flask creates session managers per request.
     This must be called after init_redis() since it depends on the Redis client.
     """
     global _session_manager
+
+    if _session_manager is not None:
+        logger.warning("Session manager already initialized")
+        return
+
     from auth.redis_client import get_redis_client
 
     redis = get_redis_client()

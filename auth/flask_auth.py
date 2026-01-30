@@ -76,8 +76,8 @@ def init_auth(app):
         """
         Async before_request hook for Flask 2.0+.
 
-        This eliminates the need for creating new event loops on every request.
         Flask automatically manages the event loop for async before_request hooks.
+        Redis client and session manager are created per-request to avoid event loop conflicts.
         """
         g.user = None
         session_id = request.cookies.get("session_id")
