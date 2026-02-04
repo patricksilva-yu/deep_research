@@ -127,5 +127,68 @@ def api_login():
         logger.error(f"Login failed: {e}")
         return jsonify({"detail": "Login failed"}), 500
 
+
+@app.route("/api/orchestrator/plan", methods=["POST", "OPTIONS"])
+def api_orchestrator_plan():
+    """
+    Flask proxy endpoint for orchestrator plan that relays to FastAPI.
+    This solves the cross-origin file upload issue.
+    """
+    if request.method == "OPTIONS":
+        # Handle preflight request
+        response = make_response()
+        response.headers["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+        response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-CSRF-Token"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        return response
+
+    try:
+        # Forward the multipart form data to FastAPI
+        # Get all form fields and files
+        files_to_send = []
+        form_data = {}
+
+        logger.info(f"Received request with form keys: {list(request.form.keys())}, files: {list(request.files.keys())}")
+
+        # Collect form fields
+        for key in request.form:
+            form_data[key] = request.form[key]
+
+        # Collect files
+        for key in request.files:
+            file = request.files[key]
+            logger.info(f"Processing file: {file.filename}")
+            files_to_send.append((key, (file.filename, file.stream, file.content_type)))
+
+        # Get headers to forward
+        headers_to_forward = {}
+        if request.headers.get("X-CSRF-Token"):
+            headers_to_forward["X-CSRF-Token"] = request.headers.get("X-CSRF-Token")
+
+        # Forward cookies
+        if request.cookies:
+            headers_to_forward["Cookie"] = "; ".join([f"{k}={v}" for k, v in request.cookies.items()])
+
+        # Make request to FastAPI
+        response = httpx.post(
+            f"{API_BASE_URL}/orchestrator/plan",
+            data=form_data,
+            files=files_to_send if files_to_send else None,
+            headers=headers_to_forward,
+            timeout=600.0  # 10 minute timeout for long-running research requests
+        )
+
+        # Return FastAPI response
+        return jsonify(response.json()), response.status_code
+
+    except httpx.TimeoutException:
+        logger.error("Orchestrator plan request timed out")
+        return jsonify({"detail": "Request timed out"}), 504
+    except Exception as e:
+        logger.error(f"Orchestrator plan failed: {e}")
+        return jsonify({"detail": "Failed to create research plan"}), 500
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3000)

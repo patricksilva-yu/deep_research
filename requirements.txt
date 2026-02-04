@@ -11,6 +11,9 @@ aiofiles
 # AI Agent Framework
 pydantic-ai
 
+# OpenAI
+openai>=2.0.0  # v2.x required for client.vector_stores (moved out of beta)
+
 # Web Search & HTTP
 httpx
 tavily-python
@@ -24,3 +27,4 @@ asyncpg
 argon2-cffi
 upstash-redis
 python-multipart
+python-magic

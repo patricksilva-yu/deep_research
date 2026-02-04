@@ -10,14 +10,17 @@
     const renameCancelBtn = document.getElementById("rename-cancel");
     const renameConfirmBtn = document.getElementById("rename-confirm");
     const renameInput = document.getElementById("rename-input");
+    const fileInput = document.getElementById("file-input");
+    const filePreviewContainer = document.getElementById("file-preview-container");
 
     // API backend URL from page meta tag or fall back to default
     const API_BASE_URL = document.documentElement.getAttribute('data-api-base-url') || 'http://localhost:8000';
-    const API_URL = `${API_BASE_URL}/orchestrator/plan`;
+    const API_URL = `/api/orchestrator/plan`;  // Use Flask proxy for file uploads
     const CONVERSATIONS_API = `${API_BASE_URL}/conversations`;
 
     let currentConversationId = null;
     let conversationData = {}; // Cache for conversation data
+    let selectedFiles = []; // Track selected files
 
     if (!form || !input || !messages) return;
 
@@ -486,6 +489,50 @@
       }
     }
 
+    function renderFilePreviews() {
+      filePreviewContainer.innerHTML = '';
+
+      if (selectedFiles.length === 0) {
+        filePreviewContainer.style.display = 'none';
+        return;
+      }
+
+      filePreviewContainer.style.display = 'flex';
+
+      selectedFiles.forEach((file, index) => {
+        const preview = document.createElement('div');
+        preview.className = 'file-preview-item';
+
+        const icon = getFileIcon(file.type);
+        const fileName = file.name.length > 20 ? file.name.substring(0, 17) + '...' : file.name;
+
+        preview.innerHTML = `
+          <span class="file-icon">${icon}</span>
+          <span class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(fileName)}</span>
+          <button type="button" class="file-remove-btn" data-index="${index}">×</button>
+        `;
+
+        filePreviewContainer.appendChild(preview);
+      });
+
+      // Add event listeners for remove buttons
+      document.querySelectorAll('.file-remove-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const index = parseInt(this.dataset.index);
+          selectedFiles.splice(index, 1);
+          renderFilePreviews();
+        });
+      });
+    }
+
+    function getFileIcon(mimeType) {
+      if (mimeType.startsWith('image/')) return '🖼️';
+      if (mimeType === 'application/pdf') return '📄';
+      if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) return '📊';
+      if (mimeType.includes('text')) return '📝';
+      return '📎';
+    }
+
     async function submitQuery(query) {
       const submitButton = form.querySelector('button[type="submit"]');
       const originalButtonText = submitButton.textContent;
@@ -494,6 +541,7 @@
         // Disable input during processing
         input.disabled = true;
         submitButton.disabled = true;
+        fileInput.disabled = true;
         submitButton.textContent = "Processing...";
 
         // Add animated loading message
@@ -514,19 +562,40 @@
         const statusMsg = addMessage(loadingHTML, "bot loading");
 
         const csrfToken = getCsrfToken();
-        const headers = {
-          "Content-Type": "application/json",
-        };
+        const headers = {};
         if (csrfToken) {
           headers["X-CSRF-Token"] = csrfToken;
         }
 
+        // Build FormData for multipart request
+        const formData = new FormData();
+        formData.append('query', query);
+
+        if (currentConversationId) {
+          formData.append('conversation_id', currentConversationId);
+        }
+
+        // Add files to FormData
+        selectedFiles.forEach(file => {
+          console.log(`Attaching file: ${file.name}, size: ${file.size} bytes`);
+          formData.append('files', file);
+        });
+
+        console.log(`Sending request to ${API_URL} with ${selectedFiles.length} file(s)`);
+        console.log('Headers:', headers);
+        console.log('FormData entries:', Array.from(formData.entries()).map(([k, v]) => `${k}: ${v instanceof File ? v.name : v}`));
+
         const response = await fetch(API_URL, {
           method: "POST",
           headers: headers,
-          credentials: 'include',  // Include cookies in cross-origin requests
-          body: JSON.stringify({ query: query }),
+          credentials: 'include',
+          body: formData
+        }).catch(err => {
+          console.error('Fetch threw an error:', err);
+          throw err;
         });
+
+        console.log('Fetch completed, got response');
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
@@ -575,13 +644,27 @@
         // Re-enable input
         input.disabled = false;
         submitButton.disabled = false;
+        fileInput.disabled = false;
         submitButton.textContent = originalButtonText;
+
+        // Clear selected files
+        selectedFiles = [];
+        fileInput.value = '';
+        renderFilePreviews();
+
         input.focus();
       }
     }
 
     // Event listeners
     newChatBtn.addEventListener('click', createNewConversation);
+
+    // File input change listener
+    fileInput.addEventListener('change', function(event) {
+      const files = Array.from(event.target.files);
+      selectedFiles = selectedFiles.concat(files);
+      renderFilePreviews();
+    });
 
     form.addEventListener("submit", function (event) {
       event.preventDefault();

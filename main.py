@@ -9,6 +9,7 @@ from api.orchestrator.router import router as orchestrator_router
 from api.code_executor.router import router as code_executor_router
 from api.summarizer.router import router as summarizer_router
 from api.verification.router import router as verification_router
+from api.files.router import router as files_router
 from auth.router import router as auth_router
 from auth.conversation_router import router as conversation_router
 from auth.database import init_db, close_db
@@ -144,6 +145,7 @@ async def generic_exception_handler(request: Request, _exc: Exception) -> JSONRe
 # Include API routers
 app.include_router(auth_router)
 app.include_router(conversation_router)
+app.include_router(files_router)
 app.include_router(orchestrator_router)
 app.include_router(code_executor_router)
 app.include_router(summarizer_router)

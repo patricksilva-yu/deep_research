@@ -140,18 +140,53 @@ async def get_conversation_messages(conversation_id: int, user_id: int) -> List[
 
 
 async def delete_conversation(conversation_id: int, user_id: int) -> bool:
-    """Delete a conversation (with user ownership check)."""
+    """Delete a conversation (with user ownership check) and cleanup associated resources."""
     pool = await get_pool()
     async with pool.acquire() as conn:
-        result = await conn.execute(
-            """
-            DELETE FROM conversations
-            WHERE id = $1 AND user_id = $2
-            """,
-            conversation_id, user_id
-        )
-        # Result is a string like "DELETE 1", extract the count
-        return "1" in result
+        async with conn.transaction():
+            # First verify ownership
+            owner_check = await conn.fetchval(
+                "SELECT user_id FROM conversations WHERE id = $1",
+                conversation_id
+            )
+            if owner_check != user_id:
+                return False
+
+            # Get vector stores to delete from OpenAI
+            vector_store_rows = await conn.fetch(
+                """
+                SELECT openai_vector_store_id
+                FROM vector_stores
+                WHERE conversation_id = $1 AND status = 'active'
+                """,
+                conversation_id
+            )
+            vector_store_ids = [row['openai_vector_store_id'] for row in vector_store_rows]
+
+            # Delete from OpenAI asynchronously (don't block on this)
+            if vector_store_ids:
+                try:
+                    from api.files.vector_store_service import delete_vector_store
+                    for vs_id in vector_store_ids:
+                        try:
+                            await delete_vector_store(vs_id)
+                            logger.info(f"Deleted vector store {vs_id} for conversation {conversation_id}")
+                        except Exception as e:
+                            logger.error(f"Failed to delete vector store {vs_id}: {e}")
+                except Exception as e:
+                    logger.error(f"Error importing vector store service: {e}")
+
+            # Delete conversation (CASCADE will handle messages, files, and vector_stores)
+            result = await conn.execute(
+                """
+                DELETE FROM conversations
+                WHERE id = $1 AND user_id = $2
+                """,
+                conversation_id, user_id
+            )
+
+            # Result is a string like "DELETE 1", extract the count
+            return "1" in result
 
 
 async def update_conversation_title(conversation_id: int, user_id: int, title: str) -> bool:

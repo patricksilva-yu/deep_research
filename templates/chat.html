@@ -30,10 +30,14 @@
       </div>
 
       <div class="chat-input-wrapper">
-        <form class="chat-input" id="chat-form">
+        <form class="chat-input" id="chat-form" enctype="multipart/form-data">
+          <div id="file-preview-container" class="file-preview-container"></div>
           <div class="input-container">
-            <span class="input-icon">+</span>
-            <input id="chat-text" type="text" placeholder="Ask anything" autocomplete="off" />
+            <label for="file-input" class="file-upload-icon" title="Upload files">
+              <span>📎</span>
+              <input type="file" id="file-input" multiple accept=".pdf,.png,.jpg,.jpeg,.gif,.csv,.txt,.md,.json,.xlsx" style="display: none;" />
+            </label>
+            <input id="chat-text" type="text" placeholder="Ask anything (with optional files)" autocomplete="off" />
             <button type="submit" class="send-button">🐝</button>
           </div>
         </form>
