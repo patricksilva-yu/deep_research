@@ -1,4 +1,4 @@
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.openai import OpenAIResponsesModelSettings
@@ -34,140 +34,163 @@ model_settings = OpenAIResponsesModelSettings(
     openai_reasoning_summary='detailed'
 )
 
-orchestrator_agent = Agent(
-    'openai-responses:gpt-5',
-    deps_type=OrchestratorState,
-    instructions=ORCHESTRATOR_INSTRUCTIONS,
-    output_type=OrchestratorOutput,
-    retries=3,
-    model_settings=model_settings
-)
 
-
-@orchestrator_agent.tool
-async def execute_search_task(ctx: RunContext[OrchestratorState], task: ResearchTask) -> dict:
-    """Execute a research task using the web search agent.
-
-    This tool allows the orchestrator to delegate search tasks to the web search agent.
-    Pass a ResearchTask with task_id, description, and search_query.
-    """
-    result = await web_search_agent.run(task.search_query)
-
-    # Use model_dump() and add task metadata
-    task_result = {
-        "task_id": task.task_id,
-        "description": task.description,
-        **result.output.model_dump()  # Spreads findings, summary, gaps, etc.
-    }
-    ctx.deps.completed_tasks[task.task_id] = task_result
-    return task_result
-
-
-@orchestrator_agent.tool_plain
-async def verify_findings(content: str, sources: List[str]) -> dict:
-    """Verify research findings for quality, credibility, and consistency.
-
-    Use this tool after completing search tasks to validate the research quality.
+def create_orchestrator_agent(vector_store_id: Optional[str] = None) -> Agent:
+    """Factory function to create orchestrator agent with optional file search.
 
     Args:
-        content: The research findings and summaries to verify
-        sources: List of source URLs cited in the research
+        vector_store_id: Optional OpenAI vector store ID for document search
 
     Returns:
-        Verification results including quality rating and issues found
+        Configured Agent instance with all tools registered
     """
-    # Construct verification prompt
-    sources_list = "\n".join(f"- {source}" for source in sources)
-    verification_prompt = f"Please verify the following research content:\n\n{content}\n\nSources cited:\n{sources_list}"
+    import logging
+    logger = logging.getLogger(__name__)
 
-    result = await verification_agent.run(verification_prompt)
+    builtin_tools = []
+    if vector_store_id:
+        from pydantic_ai.builtin_tools import FileSearchTool
+        logger.info(f"Configuring FileSearchTool with vector store: {vector_store_id}")
+        builtin_tools.append(FileSearchTool(file_store_ids=[vector_store_id]))
 
-    # Use Pydantic's model_dump() to automatically convert model to dict
-    verification_result = result.output.model_dump()
-
-    return verification_result
-
-
-@orchestrator_agent.tool_plain
-async def execute_code_task(task: str) -> dict:
-    """Execute Python code for data analysis, calculations, or processing.
-
-    Use this tool when you need to perform computational tasks, data analysis,
-    or any programmatic processing as part of the research workflow.
-
-    Args:
-        task: Description of what code needs to be executed
-
-    Returns:
-        Code execution results including summary and outputs
-    """
-    result = await code_execution_agent.run(task)
-
-    # Use Pydantic's model_dump() to automatically convert model to dict
-    code_result = result.output.model_dump()
-
-    return code_result
-
-
-@orchestrator_agent.tool
-async def generate_final_report(ctx: RunContext[OrchestratorState], mission: str, verification_results: dict = None) -> dict:
-    """Generate a comprehensive final research report from all completed tasks.
-
-    Use this tool as the FINAL step after executing all search tasks and verification.
-    This produces a polished, synthesized report with executive summary, detailed sections,
-    and source citations.
-
-    Args:
-        mission: The original research mission/question
-        verification_results: Optional verification results dict from verify_findings tool
-
-    Returns:
-        Final report with executive summary, sections, sources, and quality notes
-    """
-    # Build completed task summaries from stored tasks
-    completed_tasks = []
-    for task_id, task_data in ctx.deps.completed_tasks.items():
-        completed_tasks.append(
-            CompletedTaskSummary(
-                task_id=task_data["task_id"],
-                description=task_data["description"],
-                summary=task_data["summary"],
-                findings=task_data["findings"],
-                gaps=task_data.get("gaps")
-            )
-        )
-
-    # Build verification summary if provided
-    verification_summary = None
-    if verification_results:
-        # Convert dict results to proper model instances
-        source_assessments = [
-            SourceAssessment(**sa) for sa in verification_results["source_assessments"]
-        ]
-        consistency_issues = [
-            ConsistencyIssue(**ci) for ci in verification_results["consistency_issues"]
-        ]
-
-        verification_summary = VerificationSummary(
-            overall_quality_rating=verification_results["overall_quality_rating"],
-            approved_for_use=verification_results["approved_for_use"],
-            source_assessments=source_assessments,
-            consistency_issues=consistency_issues,
-            critical_flags=verification_results.get("critical_flags"),
-            improvement_priority=verification_results["improvement_priority"]
-        )
-
-    # Create input for summarizer
-    report_input = FinalReportInput(
-        mission=mission,
-        tasks=completed_tasks,
-        verification=verification_summary
+    agent = Agent(
+        'openai-responses:gpt-5',
+        deps_type=OrchestratorState,
+        instructions=ORCHESTRATOR_INSTRUCTIONS,
+        output_type=OrchestratorOutput,
+        retries=3,
+        model_settings=model_settings,
+        builtin_tools=builtin_tools
     )
 
-    # Generate final report - convert to JSON string for the agent
-    result = await summarizer_agent.run(report_input.model_dump_json(indent=2))
+    # Register custom tools on this agent instance
+    @agent.tool
+    async def execute_search_task(ctx: RunContext[OrchestratorState], task: ResearchTask) -> dict:
+        """Execute a research task using the web search agent.
 
-    # Use Pydantic's model_dump() to automatically convert model to dict
-    final_report = result.output.model_dump()
+        This tool allows the orchestrator to delegate search tasks to the web search agent.
+        Pass a ResearchTask with task_id, description, and search_query.
+        """
+        result = await web_search_agent.run(task.search_query)
 
-    return final_report
+        # Use model_dump() and add task metadata
+        task_result = {
+            "task_id": task.task_id,
+            "description": task.description,
+            **result.output.model_dump()  # Spreads findings, summary, gaps, etc.
+        }
+        ctx.deps.completed_tasks[task.task_id] = task_result
+        return task_result
+
+    @agent.tool_plain
+    async def verify_findings(content: str, sources: List[str]) -> dict:
+        """Verify research findings for quality, credibility, and consistency.
+
+        Use this tool after completing search tasks to validate the research quality.
+
+        Args:
+            content: The research findings and summaries to verify
+            sources: List of source URLs cited in the research
+
+        Returns:
+            Verification results including quality rating and issues found
+        """
+        # Construct verification prompt
+        sources_list = "\n".join(f"- {source}" for source in sources)
+        verification_prompt = f"Please verify the following research content:\n\n{content}\n\nSources cited:\n{sources_list}"
+
+        result = await verification_agent.run(verification_prompt)
+
+        # Use Pydantic's model_dump() to automatically convert model to dict
+        verification_result = result.output.model_dump()
+
+        return verification_result
+
+    @agent.tool_plain
+    async def execute_code_task(task: str) -> dict:
+        """Execute Python code for data analysis, calculations, or processing.
+
+        Use this tool when you need to perform computational tasks, data analysis,
+        or any programmatic processing as part of the research workflow.
+
+        Args:
+            task: Description of what code needs to be executed
+
+        Returns:
+            Code execution results including summary and outputs
+        """
+        result = await code_execution_agent.run(task)
+
+        # Use Pydantic's model_dump() to automatically convert model to dict
+        code_result = result.output.model_dump()
+
+        return code_result
+
+    @agent.tool
+    async def generate_final_report(ctx: RunContext[OrchestratorState], mission: str, verification_results: dict = None) -> dict:
+        """Generate a comprehensive final research report from all completed tasks.
+
+        Use this tool as the FINAL step after executing all search tasks and verification.
+        This produces a polished, synthesized report with executive summary, detailed sections,
+        and source citations.
+
+        Args:
+            mission: The original research mission/question
+            verification_results: Optional verification results dict from verify_findings tool
+
+        Returns:
+            Final report with executive summary, sections, sources, and quality notes
+        """
+        # Build completed task summaries from stored tasks
+        completed_tasks = []
+        for task_id, task_data in ctx.deps.completed_tasks.items():
+            completed_tasks.append(
+                CompletedTaskSummary(
+                    task_id=task_data["task_id"],
+                    description=task_data["description"],
+                    summary=task_data["summary"],
+                    findings=task_data["findings"],
+                    gaps=task_data.get("gaps")
+                )
+            )
+
+        # Build verification summary if provided
+        verification_summary = None
+        if verification_results and "source_assessments" in verification_results:
+            # Convert dict results to proper model instances
+            source_assessments = [
+                SourceAssessment(**sa) for sa in verification_results["source_assessments"]
+            ]
+            consistency_issues = [
+                ConsistencyIssue(**ci) for ci in verification_results.get("consistency_issues", [])
+            ]
+
+            verification_summary = VerificationSummary(
+                overall_quality_rating=verification_results["overall_quality_rating"],
+                approved_for_use=verification_results["approved_for_use"],
+                source_assessments=source_assessments,
+                consistency_issues=consistency_issues,
+                critical_flags=verification_results.get("critical_flags"),
+                improvement_priority=verification_results.get("improvement_priority", "low")
+            )
+
+        # Create input for summarizer
+        report_input = FinalReportInput(
+            mission=mission,
+            tasks=completed_tasks,
+            verification=verification_summary
+        )
+
+        # Generate final report - convert to JSON string for the agent
+        result = await summarizer_agent.run(report_input.model_dump_json(indent=2))
+
+        # Use Pydantic's model_dump() to automatically convert model to dict
+        final_report = result.output.model_dump()
+
+        return final_report
+
+    return agent
+
+
+# Create base agent without file search for backward compatibility
+orchestrator_agent = create_orchestrator_agent()

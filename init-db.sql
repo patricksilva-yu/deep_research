@@ -37,3 +37,38 @@ CREATE TABLE IF NOT EXISTS messages (
 
 CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
+
+-- Files table for storing uploaded files metadata
+CREATE TABLE IF NOT EXISTS files (
+    id SERIAL PRIMARY KEY,
+    conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    filename VARCHAR(255) NOT NULL,
+    original_filename VARCHAR(255) NOT NULL,
+    file_path VARCHAR(512) NOT NULL,
+    file_size INTEGER NOT NULL,
+    mime_type VARCHAR(100) NOT NULL,
+    file_type VARCHAR(20) NOT NULL CHECK (file_type IN ('image', 'document', 'other')),
+    openai_file_id VARCHAR(255),
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'uploaded', 'processed', 'error')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_files_conversation_id ON files(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_files_openai_file_id ON files(openai_file_id);
+CREATE INDEX IF NOT EXISTS idx_files_status ON files(status);
+
+-- Vector stores table for tracking OpenAI vector stores per conversation
+CREATE TABLE IF NOT EXISTS vector_stores (
+    id SERIAL PRIMARY KEY,
+    conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    openai_vector_store_id VARCHAR(255) NOT NULL UNIQUE,
+    name VARCHAR(255),
+    file_count INTEGER DEFAULT 0,
+    status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'expired', 'deleted')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX IF NOT EXISTS idx_vector_stores_conversation_id ON vector_stores(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_vector_stores_openai_id ON vector_stores(openai_vector_store_id);
+CREATE INDEX IF NOT EXISTS idx_vector_stores_status ON vector_stores(status);

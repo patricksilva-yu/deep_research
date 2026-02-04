@@ -59,6 +59,7 @@ services:
       - ./main.py:/app/main.py
       - ./static:/app/static
       - ./templates:/app/templates
+      - ./uploads:/app/uploads
     restart: unless-stopped
     depends_on:
       postgres:

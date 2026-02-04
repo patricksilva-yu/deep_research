@@ -346,3 +346,74 @@ body:has(.chat-wrapper) .site-footer { display: none; }
 .cta-block { padding: 80px 0; border-top: 1px solid var(--border-color); text-align: center; }
 .site-footer { padding: 40px 0; border-top: 1px solid var(--border-color); margin-top: auto; }
 .muted { color: var(--text-muted); font-size: 14px; text-align: center; }
+
+/* --- FILE UPLOAD STYLES --- */
+.file-upload-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 20px;
+  transition: opacity 0.2s;
+  user-select: none;
+}
+.file-upload-icon:hover {
+  opacity: 0.7;
+}
+
+.file-preview-container {
+  display: none;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px 8px;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.file-preview-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 20px;
+  font-size: 13px;
+  color: var(--text-main);
+  max-width: 200px;
+}
+
+.file-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.file-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-remove-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.file-remove-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-main);
+}
