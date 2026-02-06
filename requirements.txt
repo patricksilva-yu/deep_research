@@ -1,6 +1,8 @@
 # Core Framework
 fastapi
 uvicorn[standard]
+flask[async]  # Async support required for async before_request hooks
+gunicorn
 pydantic
 python-dotenv
 jinja2
@@ -9,6 +11,9 @@ aiofiles
 # AI Agent Framework
 pydantic-ai
 
+# OpenAI
+openai>=2.0.0  # v2.x required for client.vector_stores (moved out of beta)
+
 # Web Search & HTTP
 httpx
 tavily-python
@@ -16,3 +21,10 @@ tavily-python
 # Optional (for future deep_extract tool)
 # beautifulsoup4
 # playwright
+
+# Database & Authentication
+asyncpg
+argon2-cffi
+upstash-redis
+python-multipart
+python-magic

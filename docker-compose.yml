@@ -1,49 +1,76 @@
 services:
-  # Development: FastAPI with hot-reload (serves both frontend and API)
+  # PostgreSQL database for auth
+  postgres:
+    image: postgres:16-alpine
+    container_name: deep-research-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-deep_research}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    restart: unless-stopped
+    networks:
+      - deep-research-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis cache for sessions
+  redis:
+    image: redis:7-alpine
+    container_name: deep-research-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - deep-research-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Development: Flask + FastAPI with hot-reload
   dev:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: deep-research-dev
     ports:
-      - "8000:8000"
+      - "3000:3000"  # Flask frontend
+      - "8000:8000"  # FastAPI backend (auth + API)
     environment:
       - TAVILY_API_KEY=${TAVILY_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - LOGFIRE_TOKEN=${LOGFIRE_TOKEN}
     env_file:
       - .env
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    command: >
+      sh -c "flask run --host 0.0.0.0 --port 3000 &
+             uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
     volumes:
+      - ./app.py:/app/app.py
+      - ./auth:/app/auth
       - ./api:/app/api
       - ./main.py:/app/main.py
       - ./static:/app/static
       - ./templates:/app/templates
+      - ./uploads:/app/uploads
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - deep-research-network
-    profiles:
-      - development
 
-  # Production: FastAPI with multiple workers (serves both frontend and API)
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: deep-research-app
-    ports:
-      - "8000:8000"
-    environment:
-      - TAVILY_API_KEY=${TAVILY_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - LOGFIRE_TOKEN=${LOGFIRE_TOKEN}
-    env_file:
-      - .env
-    restart: unless-stopped
-    networks:
-      - deep-research-network
-    profiles:
-      - production
+volumes:
+  postgres_data:
 
 networks:
   deep-research-network:
