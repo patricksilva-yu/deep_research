@@ -3,7 +3,6 @@ from pydantic import BaseModel
 from typing import Optional, Annotated, List
 from pydantic_ai.messages import BinaryContent
 
-from .agents import orchestrator_agent, OrchestratorState, create_orchestrator_agent
 from .models import OrchestratorOutput
 from auth.dependencies import get_current_user, CurrentUser
 from auth.conversation_db import (
@@ -14,6 +13,8 @@ from api.files.validation import validate_upload_file
 from api.files.service import save_file, load_file_content
 from api.files.db import insert_file, update_file_status, insert_vector_store
 from api.files.vector_store_service import upload_file_to_openai, create_vector_store
+from api.orchestrator.agent import create_research_agent, research_agent
+from api.research_runtime.models import ResearchSessionState
 import logging
 
 logger = logging.getLogger(__name__)
@@ -139,16 +140,16 @@ async def create_plan(
             logger.info(f"Added {len(image_contents)} images to prompt")
 
         # 6. Run orchestrator agent with optional file search for documents
-        state = OrchestratorState()
+        state = ResearchSessionState(mission=query)
 
         if vector_store_id:
             # Create agent with FileSearchTool for document search
             logger.info(f"Running orchestrator agent with FileSearchTool for vector store {vector_store_id}")
-            agent = create_orchestrator_agent(vector_store_id)
+            agent = create_research_agent(vector_store_id)
             result = await agent.run(user_prompt, deps=state)
         else:
             logger.info("Running orchestrator agent without file search")
-            result = await orchestrator_agent.run(user_prompt, deps=state)
+            result = await research_agent.run(user_prompt, deps=state)
 
         output = result.output  # OrchestratorOutput with plan and final_report
 
@@ -164,10 +165,14 @@ async def create_plan(
             role="assistant",
             content=display_content,
             metadata={
-                "plan": output.plan.model_dump(),
-                "final_report": output.final_report.model_dump() if output.final_report else None,
+                "plan": output.plan.model_dump(mode="json"),
+                "final_report": output.final_report.model_dump(mode="json") if output.final_report else None,
                 "files_uploaded": len(files),
-                "vector_store_id": vector_store_id
+                "vector_store_id": vector_store_id,
+                "research_memory": state.compacted_memory.model_dump(mode="json") if state.compacted_memory else None,
+                "research_ledger": state.ledger.model_dump(mode="json") if state.ledger else None,
+                "verification_results": [result.model_dump(mode="json") for result in state.verification_results],
+                "research_artifacts": state.artifacts,
             }
         )
 

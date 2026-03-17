@@ -7,6 +7,7 @@ A full-stack AI-powered research assistant that orchestrates multiple specialize
 - **Backend**: FastAPI + Uvicorn (Python 3.11)
 - **Frontend**: Flask + Vanilla JavaScript
 - **AI Framework**: Pydantic-AI
+- **Tool Server**: FastMCP
 - **Search**: Tavily API
 - **LLM**: OpenAI API
 
@@ -50,14 +51,59 @@ A full-stack AI-powered research assistant that orchestrates multiple specialize
    pip install -r requirements.txt
    ```
 
+   Optional browser support:
+   ```bash
+   pip install playwright
+   playwright install chromium
+   ```
+
 2. **Run the services**
    ```bash
-   # Terminal 1 - Backend API
+   # Terminal 1 - FastMCP research hub
+   ./start_mcp.sh
+
+   # Terminal 2 - Backend API
    uvicorn main:app --reload --port 8000
 
-   # Terminal 2 - Frontend
+   # Terminal 3 - Frontend
    python app.py
    ```
+
+### Local Development with Docker Compose
+
+The default Docker setup runs four services:
+
+- `postgres`
+- `redis`
+- `mcp` on `http://localhost:9000/mcp`
+- `dev` for Flask + FastAPI on ports `3000` and `8000`
+
+Start everything with:
+
+```bash
+docker-compose up --build
+```
+
+Health checks:
+
+- App API: `http://localhost:8000/health`
+- MCP hub: `http://localhost:9000/health`
+
+## Research Architecture
+
+The current migration target is a single research agent running on `gpt-5.4` with:
+
+- FastMCP tools for search, fetch, browse, verification, and compaction
+- Reusable project skills under `skills/`
+- Explicit compacted research memory stored alongside conversation metadata
+- Optional Playwright-backed browser access with HTTP fallback when Playwright is unavailable
+- MCP-backed execution when `MCP_SERVER_URL` is set; local tool fallback otherwise
+
+Relevant paths:
+
+- `api/research/` - single-agent research flow and shared tool services
+- `mcp_servers/research_hub/` - FastMCP tool server
+- `skills/` - reusable workflow skills
 
 ## Docker Deployment
 
@@ -185,4 +231,3 @@ deep_research/
 ## License
 
 [Add your license here]
-

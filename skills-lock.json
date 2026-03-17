@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "skills": {
+    "data-analysis": {
+      "source": "supercent-io/skills-template",
+      "sourceType": "github",
+      "computedHash": "d380eb6230b7a285a63b11e18c6c7eeae37f2dd502610ec390975ae1b8627b29"
+    },
+    "fact-checker": {
+      "source": "shubhamsaboo/awesome-llm-apps",
+      "sourceType": "github",
+      "computedHash": "fb8df7db8d769f67f25a425cb03afe8916da96ac739ba5cf65c5f90faa225531"
+    },
+    "literature-review": {
+      "source": "davila7/claude-code-templates",
+      "sourceType": "github",
+      "computedHash": "7f0a6a43382779c7c03904d02049b71a3e0b0492da0299db25fe5efd70997711"
+    }
+  }
+}
