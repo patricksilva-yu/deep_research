@@ -1,0 +1,4 @@
+interface:
+  display_name: "Research Planner"
+  short_description: "Plan multi-step research efficiently"
+  default_prompt: "Use $research-planner to build a concise research plan before starting deep investigation."

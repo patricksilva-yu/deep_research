@@ -17,7 +17,6 @@ from auth.csrf import generate_csrf_token
 from auth.rate_limit import get_rate_limiter
 from auth.redis_client import get_redis_client
 from auth.dependencies import get_current_user, CurrentUser
-from upstash_redis.asyncio import Redis
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +89,7 @@ async def login(
     req: LoginRequest,
     request: Request,
     db = Depends(get_db),
-    redis: Annotated[Redis, Depends(get_redis_client)] = None,
+    redis: Annotated[object, Depends(get_redis_client)] = None,
 ):
     """
     Authenticate user and create session.

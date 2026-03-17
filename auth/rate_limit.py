@@ -4,7 +4,7 @@ Implements sliding window counters for login attempts.
 """
 import logging
 from datetime import datetime, timedelta
-from upstash_redis.asyncio import Redis
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ class RateLimiter:
     Rate limiting and account lockout using Redis.
     """
 
-    def __init__(self, redis: Redis):
+    def __init__(self, redis: Any):
         self.redis = redis
 
     async def check_ip_rate_limit(self, ip: str) -> bool:
@@ -150,7 +150,7 @@ class RateLimiter:
         logger.info(f"Account unlocked: user {user_id}")
 
 
-def get_rate_limiter(redis: Redis) -> RateLimiter:
+def get_rate_limiter(redis: Any) -> RateLimiter:
     """
     Create a RateLimiter instance with the provided Redis client.
 

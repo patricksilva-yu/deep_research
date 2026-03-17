@@ -1,26 +1,24 @@
 """
 Redis client management for Flask and FastAPI.
 
-For Flask: Creates a new client per request to avoid event loop conflicts
-For FastAPI: Uses a singleton client for efficiency (FastAPI has stable event loops)
-
-The Upstash Redis client is HTTP-based but uses aiohttp internally, which binds
-to the event loop at creation time. Flask creates new event loops per request,
-so we need to create new clients. FastAPI reuses the same event loop, so a
-singleton is safe.
+Supports either:
+- Local/standard Redis via `REDIS_URL`
+- Upstash Redis REST via `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`
 """
 import logging
 import os
-from typing import Optional
-from upstash_redis.asyncio import Redis
+from typing import Any, Optional
+
+from redis.asyncio import Redis as AsyncRedis
+from upstash_redis.asyncio import Redis as UpstashRedis
 
 logger = logging.getLogger(__name__)
 
 # Global Redis client instance (singleton) - used only by FastAPI
-_redis_client: Optional[Redis] = None
+_redis_client: Optional[Any] = None
 
 
-def _create_redis_client() -> Redis:
+def _create_redis_client() -> Any:
     """
     Create a new Redis client instance.
 
@@ -30,15 +28,20 @@ def _create_redis_client() -> Redis:
     Raises:
         ValueError: If Redis credentials not set in environment
     """
+    local_redis_url = os.getenv("REDIS_URL")
+    if local_redis_url:
+        logger.info("Using local Redis client")
+        return AsyncRedis.from_url(local_redis_url, decode_responses=True)
+
     redis_url = os.getenv("UPSTASH_REDIS_REST_URL")
     redis_token = os.getenv("UPSTASH_REDIS_REST_TOKEN")
+    if redis_url and redis_token:
+        logger.info("Using Upstash Redis client")
+        return UpstashRedis(url=redis_url, token=redis_token)
 
-    if not redis_url or not redis_token:
-        raise ValueError(
-            "UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN environment variables must be set"
-        )
-
-    return Redis(url=redis_url, token=redis_token)
+    raise ValueError(
+        "Set REDIS_URL for local Redis or UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN for Upstash"
+    )
 
 
 async def init_redis() -> None:
@@ -76,7 +79,7 @@ async def close_redis() -> None:
     logger.info("Redis client closed")
 
 
-def get_redis_client() -> Redis:
+def get_redis_client() -> Any:
     """
     Get a Redis client instance.
 
@@ -109,6 +112,5 @@ def get_redis_client() -> Redis:
     if _redis_client is not None:
         return _redis_client
 
-    # For Flask (per-request pattern) - create a new client
-    # This avoids event loop binding issues since Flask creates new loops per request
+    # For Flask and fallback code paths, create a client on demand.
     return _create_redis_client()

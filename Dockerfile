@@ -32,8 +32,8 @@ RUN useradd -m -u 1000 appuser && \
 
 USER appuser
 
-# Expose ports for both services
-EXPOSE 5000 8000
+# Expose ports for app and MCP service
+EXPOSE 3000 8000 9000
 
 # Production command using Gunicorn for Flask and Uvicorn for FastAPI
 CMD ["./start.sh"]
