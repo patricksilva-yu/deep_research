@@ -6,9 +6,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic_ai.exceptions import ModelHTTPError
 from api.orchestrator.router import router as orchestrator_router
-from api.code_executor.router import router as code_executor_router
-from api.summarizer.router import router as summarizer_router
-from api.verification.router import router as verification_router
 from api.files.router import router as files_router
 from auth.router import router as auth_router
 from auth.conversation_router import router as conversation_router
@@ -49,7 +46,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Deep Research API",
-    description="Multi-agent deep research system with web search, orchestration, code execution, and verification",
+    description="Single-agent deep research system with MCP-backed tools and structured research memory",
     version="0.1.0",
     lifespan=lifespan
 )
@@ -147,9 +144,6 @@ app.include_router(auth_router)
 app.include_router(conversation_router)
 app.include_router(files_router)
 app.include_router(orchestrator_router)
-app.include_router(code_executor_router)
-app.include_router(summarizer_router)
-app.include_router(verification_router)
 
 
 @app.get("/health")

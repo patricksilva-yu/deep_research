@@ -21,6 +21,8 @@
     let currentConversationId = null;
     let conversationData = {}; // Cache for conversation data
     let selectedFiles = []; // Track selected files
+    let isCreatingConversation = false;
+    let isSubmittingQuery = false;
 
     if (!form || !input || !messages) return;
 
@@ -34,7 +36,7 @@
     }
 
     function formatFinalReport(report) {
-      let html = '<div class="final-report">';
+      let html = '<div class="final-report-body">';
 
       // Executive Summary (removed mission restatement)
       html += `<h2>📋 Executive Summary</h2>`;
@@ -69,6 +71,48 @@
           html += `<li>${formatTextWithLinks(action)}</li>`;
         });
         html += `</ul>`;
+      }
+
+      // Claim Support
+      if (report.support_overview) {
+        html += `<h3>🧪 Support Check</h3>`;
+        html += `<div class="support-overview">`;
+        html += `<p><strong>Supported:</strong> ${escapeHtml(String(report.support_overview.supported_claims || 0))} · `;
+        html += `<strong>Partial:</strong> ${escapeHtml(String(report.support_overview.partial_claims || 0))} · `;
+        html += `<strong>Unsupported:</strong> ${escapeHtml(String(report.support_overview.unsupported_claims || 0))} · `;
+        html += `<strong>Conflicting:</strong> ${escapeHtml(String(report.support_overview.conflicting_claims || 0))}</p>`;
+        if (report.support_overview.notes) {
+          html += `<p>${formatTextWithLinks(report.support_overview.notes)}</p>`;
+        }
+        html += `</div>`;
+      }
+
+      if (report.claim_support && report.claim_support.length > 0) {
+        html += `<h3>🧾 Verified Claims</h3>`;
+        html += `<div class="claim-support-list">`;
+        report.claim_support.forEach((item) => {
+          const status = (item.status || 'unknown').toUpperCase();
+          html += `<div class="claim-support-item">`;
+          html += `<p><strong>${escapeHtml(status)}:</strong> ${formatTextWithLinks(item.claim || '')}</p>`;
+          if (item.reasoning) {
+            html += `<p>${formatTextWithLinks(item.reasoning)}</p>`;
+          }
+          if (item.evidence_snippets && item.evidence_snippets.length > 0) {
+            html += `<ul>`;
+            item.evidence_snippets.slice(0, 2).forEach(snippet => {
+              html += `<li>${formatTextWithLinks(snippet)}</li>`;
+            });
+            html += `</ul>`;
+          }
+          if (item.supporting_urls && item.supporting_urls.length > 0) {
+            html += `<p>${item.supporting_urls.slice(0, 3).map(url => {
+              const safeUrl = escapeHtml(url);
+              return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeUrl}</a>`;
+            }).join(' · ')}</p>`;
+          }
+          html += `</div>`;
+        });
+        html += `</div>`;
       }
 
       // Quality Notes
@@ -163,6 +207,28 @@
       return html;
     }
 
+    function formatResearchResponse(plan, report) {
+      let html = '<div class="research-result">';
+      html += '<div class="research-result-header">';
+      html += '<div class="research-result-kicker">Research Result</div>';
+      html += '<h2>Answer</h2>';
+      html += '</div>';
+
+      if (report) {
+        html += formatFinalReport(report);
+      }
+
+      if (plan) {
+        html += '<details class="research-plan-details">';
+        html += '<summary>How it was researched</summary>';
+        html += formatResearchPlan(plan);
+        html += '</details>';
+      }
+
+      html += '</div>';
+      return html;
+    }
+
     function getCsrfToken() {
       // Extract CSRF token from cookies
       const name = "csrf_token=";
@@ -236,6 +302,18 @@
         });
 
         renderConversationList(conversations);
+
+        if (currentConversationId && conversationData[currentConversationId]) {
+          return;
+        }
+
+        if (conversations.length > 0) {
+          await selectConversation(conversations[0].id);
+        } else {
+          currentConversationId = null;
+          document.getElementById('chat-empty-state').style.display = 'block';
+          document.getElementById('chat-container').style.display = 'none';
+        }
       } catch (error) {
         console.error("Error loading conversations:", error);
       }
@@ -287,6 +365,9 @@
     }
 
     async function createNewConversation() {
+      if (isCreatingConversation) return null;
+      isCreatingConversation = true;
+      newChatBtn.disabled = true;
       try {
         const csrfToken = getCsrfToken();
         const headers = {
@@ -312,9 +393,14 @@
 
         await selectConversation(newConversation.id);
         await loadConversations();
+        return newConversation;
       } catch (error) {
         console.error("Error creating conversation:", error);
         addMessage(`❌ Error creating conversation: ${error.message}`, "bot");
+        return null;
+      } finally {
+        isCreatingConversation = false;
+        newChatBtn.disabled = false;
       }
     }
 
@@ -534,6 +620,10 @@
     }
 
     async function submitQuery(query) {
+      if (isSubmittingQuery) {
+        return;
+      }
+      isSubmittingQuery = true;
       const submitButton = form.querySelector('button[type="submit"]');
       const originalButtonText = submitButton.textContent;
 
@@ -542,6 +632,7 @@
         input.disabled = true;
         submitButton.disabled = true;
         fileInput.disabled = true;
+        newChatBtn.disabled = true;
         submitButton.textContent = "Processing...";
 
         // Add animated loading message
@@ -607,25 +698,19 @@
         // Remove status message
         statusMsg.remove();
 
-        // Display the research plan first
-        if (data.plan) {
+        if (data.final_report) {
+          const responseHtml = formatResearchResponse(data.plan, data.final_report);
+          addMessage(responseHtml, "bot");
+          if (currentConversationId) {
+            await saveMessageToConversation(currentConversationId, "bot", responseHtml);
+          }
+        } else if (data.plan) {
           const planHtml = formatResearchPlan(data.plan);
           addMessage(planHtml, "bot");
           if (currentConversationId) {
             await saveMessageToConversation(currentConversationId, "bot", planHtml);
           }
-        }
-
-        // Display the final report if available
-        if (data.final_report) {
-          addMessage("🎉 <strong>Research Complete!</strong> Here's your comprehensive report:", "bot");
-          const reportHtml = formatFinalReport(data.final_report);
-          addMessage(reportHtml, "bot");
-          if (currentConversationId) {
-            await saveMessageToConversation(currentConversationId, "bot", reportHtml);
-          }
         } else {
-          // If no final report, the orchestrator might not have executed yet
           const infoMsg = "⏳ Research plan created. The orchestrator will now execute the tasks and generate your report...";
           addMessage(infoMsg, "bot");
           if (currentConversationId) {
@@ -645,7 +730,9 @@
         input.disabled = false;
         submitButton.disabled = false;
         fileInput.disabled = false;
+        newChatBtn.disabled = false;
         submitButton.textContent = originalButtonText;
+        isSubmittingQuery = false;
 
         // Clear selected files
         selectedFiles = [];
@@ -666,14 +753,18 @@
       renderFilePreviews();
     });
 
-    form.addEventListener("submit", function (event) {
+    form.addEventListener("submit", async function (event) {
       event.preventDefault();
+      if (isSubmittingQuery) return;
       const text = (input.value || "").trim();
       if (!text) return;
 
       if (!currentConversationId) {
-        addMessage("❌ Please create or select a conversation first", "bot");
-        return;
+        const newConversation = await createNewConversation();
+        if (!newConversation) {
+          addMessage("❌ Please create or select a conversation first", "bot");
+          return;
+        }
       }
 
       addMessage(escapeHtml(text), "user");

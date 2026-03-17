@@ -2,7 +2,7 @@
 Database operations for conversation history.
 Handles CRUD operations for conversations and messages using asyncpg.
 """
-from typing import List, Optional
+from typing import Any, List, Optional
 from datetime import datetime
 from auth.database import get_pool
 from auth.conversation_models import ConversationResponse, MessageResponse
@@ -10,6 +10,16 @@ import json
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def _strip_null_bytes(value: Any) -> Any:
+    if isinstance(value, str):
+        return value.replace("\x00", "")
+    if isinstance(value, list):
+        return [_strip_null_bytes(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _strip_null_bytes(item) for key, item in value.items()}
+    return value
 
 
 async def create_conversation(user_id: int, title: str) -> ConversationResponse:
@@ -72,7 +82,7 @@ async def add_message(
     async with pool.acquire() as conn:
         async with conn.transaction():
             # Insert message - asyncpg handles JSONB serialization automatically
-            metadata_json = json.dumps(metadata) if metadata else None
+            metadata_json = json.dumps(_strip_null_bytes(metadata)) if metadata else None
             row = await conn.fetchrow(
                 """
                 INSERT INTO messages (conversation_id, role, content, metadata)

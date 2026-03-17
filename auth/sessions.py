@@ -8,7 +8,6 @@ import secrets
 from typing import Optional, Dict, Any
 from datetime import datetime
 import logging
-from upstash_redis.asyncio import Redis
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +18,7 @@ class UpstashSessionManager:
     Sessions store user_id and metadata with configurable TTL.
     """
 
-    def __init__(self, redis: Redis):
+    def __init__(self, redis: Any):
         """
         Initialize session manager with a Redis client.
 
