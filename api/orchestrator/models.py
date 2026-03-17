@@ -22,7 +22,6 @@ class ResearchPlan(BaseModel):
 class OrchestratorOutput(BaseModel):
     """Output from the single research agent."""
     plan: ResearchPlan = Field(description="The research plan")
-    final_report: Optional[FinalReport] = Field(
-        default=None,
+    final_report: FinalReport = Field(
         description="The final synthesized research report, generated after executing all tasks",
     )

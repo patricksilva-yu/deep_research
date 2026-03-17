@@ -1,5 +1,6 @@
 import hashlib
 import os
+import re
 from typing import Dict, Iterable, List
 
 from dotenv import load_dotenv
@@ -52,7 +53,7 @@ def chunk_page(
         end = min(start + chunk_size, len(text))
         chunk_text = text[start:end].strip()
         if chunk_text:
-            raw_id = f"{page.url}:{start}:{end}".encode("utf-8")
+            raw_id = f"{page.url}:{page.retrieval_method}:{start}:{end}".encode("utf-8")
             chunk_id = hashlib.sha1(raw_id).hexdigest()[:16]
             chunks.append(
                 EvidenceChunk(
@@ -101,6 +102,45 @@ def _breadth_first_fallback(chunks: List[EvidenceChunk], limit: int) -> List[Evi
     return selected
 
 
+def _tokenize(text: str) -> set[str]:
+    return {token for token in re.findall(r"[a-z0-9]+", text.lower()) if len(token) > 2}
+
+
+def _is_review_like(text: str) -> bool:
+    lowered = text.lower()
+    first_person_hits = sum(lowered.count(token) for token in (" i ", " my ", " we ", " our "))
+    service_hits = sum(lowered.count(token) for token in (" boarding", " luggage", " cabin crew", " seat", "wifi", "pilot", "flight was"))
+    return first_person_hits >= 3 and service_hits >= 2
+
+
+def _is_navigation_like(text: str) -> bool:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if len(lines) >= 8:
+        short_lines = sum(1 for line in lines if len(line.split()) <= 4)
+        if short_lines / len(lines) >= 0.6:
+            return True
+    return False
+
+
+def _candidate_score(claim: str, chunk: EvidenceChunk) -> float:
+    claim_tokens = _tokenize(claim)
+    chunk_tokens = _tokenize(chunk.text)
+    overlap = len(claim_tokens & chunk_tokens)
+    numeric_bonus = len(re.findall(r"(?:cad|\$|usd|€|£|\d{2,})", chunk.text.lower()))
+    score = float(overlap) + min(numeric_bonus * 0.25, 3.0)
+    if _is_review_like(f" {chunk.text.lower()} "):
+        score -= 4.0
+    if _is_navigation_like(chunk.text):
+        score -= 3.0
+    return score
+
+
+def _preselect_candidates(claim: str, chunks: List[EvidenceChunk], limit: int) -> List[EvidenceChunk]:
+    ranked = sorted(chunks, key=lambda chunk: (_candidate_score(claim, chunk), chunk.lexical_score), reverse=True)
+    selected = [chunk for chunk in ranked if _candidate_score(claim, chunk) > 0][:limit]
+    return selected or ranked[:limit]
+
+
 async def retrieve_evidence_candidates(
     claim: str,
     chunks: Iterable[EvidenceChunk],
@@ -110,7 +150,7 @@ async def retrieve_evidence_candidates(
     if not candidate_pool:
         return EvidenceRetrievalResult(claim=claim, candidates=[])
 
-    selector_candidates = candidate_pool[:MAX_SELECTOR_CANDIDATES]
+    selector_candidates = _preselect_candidates(claim, candidate_pool, MAX_SELECTOR_CANDIDATES)
     prompt = {
         "claim": claim,
         "candidate_chunks": [

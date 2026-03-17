@@ -4,6 +4,7 @@ from typing import Dict, List, Optional
 
 
 PROJECT_SKILLS_DIR = Path(__file__).resolve().parents[2] / "skills"
+WORKSPACE_AGENTS_SKILLS_DIR = Path(__file__).resolve().parents[2] / ".agents" / "skills"
 CODEX_SKILLS_DIR = Path(os.getenv("CODEX_HOME", Path.home() / ".codex")) / "skills"
 AGENTS_SKILLS_DIR = Path.home() / ".agents" / "skills"
 
@@ -36,7 +37,7 @@ def _load_skill_text(skill_dir: Path) -> Optional[str]:
 
 def list_project_skills() -> List[dict]:
     skills_by_name: Dict[str, dict] = {}
-    for skills_dir in [PROJECT_SKILLS_DIR, CODEX_SKILLS_DIR, AGENTS_SKILLS_DIR]:
+    for skills_dir in [PROJECT_SKILLS_DIR, WORKSPACE_AGENTS_SKILLS_DIR, CODEX_SKILLS_DIR, AGENTS_SKILLS_DIR]:
         if not skills_dir.exists():
             continue
 
@@ -57,7 +58,7 @@ def list_project_skills() -> List[dict]:
 
 
 def load_project_skill(skill_name: str) -> str:
-    for skills_dir in [PROJECT_SKILLS_DIR, CODEX_SKILLS_DIR, AGENTS_SKILLS_DIR]:
+    for skills_dir in [PROJECT_SKILLS_DIR, WORKSPACE_AGENTS_SKILLS_DIR, CODEX_SKILLS_DIR, AGENTS_SKILLS_DIR]:
         skill_file = skills_dir / skill_name / "SKILL.md"
         if skill_file.exists():
             return skill_file.read_text(encoding="utf-8")

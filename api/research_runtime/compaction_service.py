@@ -22,12 +22,94 @@ compactor_agent = Agent(
     instructions=(
         "You compress stale working context into a structured research ledger. "
         "Keep source URLs and evidence references, preserve open questions and next actions, "
-        "and avoid copying long excerpts. Return only structured ledger data."
+        "and avoid copying long excerpts. "
+        "Do not copy wrapper field names, schema labels, or prompt keys into ledger contents. "
+        "Return only structured ledger data."
     ),
     output_type=ResearchLedger,
     model_settings=compactor_settings,
     retries=2,
 )
+
+_SCHEMA_FIELD_NAMES = {
+    "mission",
+    "existing_ledger",
+    "search_queries",
+    "finding_artifacts",
+    "fetched_pages",
+    "verification_results",
+    "fallback_memory",
+    "confirmed_findings",
+    "open_questions",
+    "next_actions",
+    "source_urls",
+    "compaction_notes",
+}
+
+
+def _clean_list(items: List[str]) -> List[str]:
+    cleaned: List[str] = []
+    seen = set()
+    for item in items:
+        normalized = " ".join(str(item).split())
+        if not normalized:
+            continue
+        if normalized in _SCHEMA_FIELD_NAMES:
+            continue
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        cleaned.append(normalized)
+    return cleaned
+
+
+def _sanitize_ledger(ledger: ResearchLedger) -> ResearchLedger:
+    mission = " ".join((ledger.mission or "").split()) or None
+    if mission in _SCHEMA_FIELD_NAMES:
+        mission = None
+
+    source_urls = []
+    seen_urls = set()
+    for url in ledger.source_urls:
+        if url in seen_urls:
+            continue
+        seen_urls.add(url)
+        source_urls.append(url)
+
+    return ResearchLedger(
+        mission=mission,
+        search_queries=_clean_list(ledger.search_queries),
+        confirmed_findings=_clean_list(ledger.confirmed_findings),
+        open_questions=_clean_list(ledger.open_questions),
+        next_actions=_clean_list(ledger.next_actions),
+        source_urls=source_urls,
+        compaction_notes=ledger.compaction_notes,
+    )
+
+
+def _ledger_is_suspicious(ledger: ResearchLedger) -> bool:
+    content_items = (
+        ledger.search_queries
+        + ledger.confirmed_findings
+        + ledger.open_questions
+        + ledger.next_actions
+    )
+    if not content_items and not ledger.source_urls:
+        return True
+    schema_hits = sum(1 for item in content_items if item in _SCHEMA_FIELD_NAMES)
+    return schema_hits >= max(1, len(content_items) // 3)
+
+
+def _deterministic_ledger_from_memory(memory: ResearchMemory) -> ResearchLedger:
+    return ResearchLedger(
+        mission=memory.mission,
+        search_queries=_clean_list(memory.search_queries),
+        confirmed_findings=_clean_list(memory.confirmed_findings),
+        open_questions=_clean_list(memory.open_questions),
+        next_actions=_clean_list(memory.next_actions),
+        source_urls=memory.high_value_sources,
+        compaction_notes="Deterministic compaction used from current research memory.",
+    )
 
 
 def build_fallback_memory(
@@ -99,34 +181,6 @@ async def compact_research_state(
         existing_ledger=existing_ledger,
     )
 
-    prompt = {
-        "mission": mission,
-        "existing_ledger": existing_ledger.model_dump(mode="json") if existing_ledger else None,
-        "search_queries": search_queries[-12:],
-        "finding_artifacts": [artifact.model_dump(mode="json") for artifact in finding_artifacts[-8:]],
-        "fetched_pages": [
-            {
-                "url": str(page.url),
-                "title": page.title,
-                "fetch_status": page.fetch_status,
-                "retrieval_method": page.retrieval_method,
-            }
-            for page in fetched_pages[-10:]
-        ],
-        "verification_results": [result.model_dump(mode="json") for result in verification_results[-10:]],
-        "fallback_memory": fallback_memory.model_dump(mode="json"),
-    }
-
-    try:
-        result = await compactor_agent.run(prompt)
-        return result.output
-    except Exception:
-        return ResearchLedger(
-            mission=fallback_memory.mission,
-            search_queries=fallback_memory.search_queries,
-            confirmed_findings=fallback_memory.confirmed_findings,
-            open_questions=fallback_memory.open_questions,
-            next_actions=fallback_memory.next_actions,
-            source_urls=fallback_memory.high_value_sources,
-            compaction_notes="Fallback ledger used because model compaction was unavailable.",
-        )
+    ledger = _deterministic_ledger_from_memory(fallback_memory)
+    ledger.compaction_notes = "Deterministic compaction used; model compaction is disabled for reliability."
+    return ledger

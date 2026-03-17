@@ -27,7 +27,7 @@ async def retrieve_evidence_chunks(
         return []
 
     store = build_evidence_store(fetched_pages)
-    retrieved = retrieve_evidence_candidates(claim=claim, chunks=store.values(), limit=8)
+    retrieved = await retrieve_evidence_candidates(claim=claim, chunks=store.values(), limit=8)
     reranked = await rerank_evidence_chunks(claim=claim, chunks=retrieved.candidates, limit=5)
     ranked_lookup = {chunk_id: index for index, chunk_id in enumerate(reranked.ranked_chunk_ids)}
 

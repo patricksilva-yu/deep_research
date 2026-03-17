@@ -46,6 +46,27 @@ def _build_excerpt(text: str, max_chars: int = 500, max_sentences: int = 3) -> O
     return cleaned[:max_chars]
 
 
+def _classify_http_status(status_code: int) -> str:
+    if status_code == 403:
+        return "blocked_forbidden"
+    if status_code == 429:
+        return "blocked_rate_limited"
+    if status_code >= 500:
+        return f"http_{status_code}"
+    return f"http_{status_code}"
+
+
+def _classify_extracted_content(text: str) -> Optional[str]:
+    normalized = text.lower()
+    if "verify that you're not a robot" in normalized or "verify that you are not a robot" in normalized:
+        return "blocked_antibot"
+    if "enable javascript" in normalized and ("reload the page" in normalized or "run this app" in normalized):
+        return "blocked_javascript"
+    if "access denied" in normalized:
+        return "blocked_access_denied"
+    return None
+
+
 async def fetch_url(url: str, timeout_seconds: float = 20.0) -> ExtractedPage:
     try:
         async with httpx.AsyncClient(follow_redirects=True, timeout=timeout_seconds) as client:
@@ -57,7 +78,7 @@ async def fetch_url(url: str, timeout_seconds: float = 20.0) -> ExtractedPage:
             extracted_text=f"Fetch failed for {url}: {exc}",
             excerpt=None,
             retrieval_method="httpx-error",
-            fetch_status="error",
+            fetch_status="network_error",
         )
 
     body = response.text
@@ -69,7 +90,7 @@ async def fetch_url(url: str, timeout_seconds: float = 20.0) -> ExtractedPage:
             extracted_text=f"Fetch failed for {url}: HTTP {response.status_code}",
             excerpt=None,
             retrieval_method="httpx-error",
-            fetch_status=fetch_status,
+            fetch_status=_classify_http_status(response.status_code),
         )
 
     if trafilatura:
@@ -82,6 +103,7 @@ async def fetch_url(url: str, timeout_seconds: float = 20.0) -> ExtractedPage:
 
     title_match = re.search(r"(?is)<title>(.*?)</title>", body)
     title: Optional[str] = html.unescape(title_match.group(1)).strip() if title_match else None
+    content_status = _classify_extracted_content(extracted_text)
     excerpt = _build_excerpt(extracted_text)
     retrieval_method = "trafilatura" if trafilatura else "httpx-html-strip"
     return ExtractedPage(
@@ -90,5 +112,5 @@ async def fetch_url(url: str, timeout_seconds: float = 20.0) -> ExtractedPage:
         extracted_text=extracted_text,
         excerpt=excerpt,
         retrieval_method=retrieval_method,
-        fetch_status=fetch_status,
+        fetch_status=content_status or fetch_status,
     )

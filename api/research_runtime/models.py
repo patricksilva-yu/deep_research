@@ -204,6 +204,10 @@ class VerificationSummary(BaseModel):
 class FinalReportInput(BaseModel):
     mission: str = Field(description="Overall mission statement from the research plan")
     tasks: List[CompletedTaskSummary] = Field(description="Completed task outputs from the orchestrator")
+    finding_artifacts: List[ResearchFindingArtifact] = Field(
+        default_factory=list,
+        description="Recorded grounded findings accumulated during the run",
+    )
     verification: Optional[VerificationSummary] = Field(default=None, description="Verification summary if quality checks were completed")
 
 
@@ -253,6 +257,7 @@ class ResearchSessionState:
     mission: Optional[str] = None
     search_queries: List[str] = field(default_factory=list)
     fetched_pages: Dict[str, ExtractedPage] = field(default_factory=dict)
+    search_snippet_pages: Dict[str, List[ExtractedPage]] = field(default_factory=dict)
     evidence_chunks: Dict[str, EvidenceChunk] = field(default_factory=dict)
     verification_results: List[ClaimSupportResult] = field(default_factory=list)
     finding_artifacts: List[ResearchFindingArtifact] = field(default_factory=list)
@@ -285,7 +290,6 @@ class ResearchPlan(BaseModel):
 class OrchestratorOutput(BaseModel):
     """Output from the single research agent."""
     plan: ResearchPlan = Field(description="The research plan")
-    final_report: Optional[FinalReport] = Field(
-        default=None,
+    final_report: FinalReport = Field(
         description="The final synthesized research report, generated after executing all tasks",
     )

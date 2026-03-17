@@ -1,6 +1,8 @@
 import os
 from typing import Any, Dict, List, Optional
 
+import logfire
+
 from .models import ClaimSupportResult, EvidenceChunk, ExtractedPage, ResearchFindingArtifact, ResearchLedger, ResearchMemory, SearchResult
 from .skills import list_project_skills, load_project_skill
 from .compaction_service import build_fallback_memory, compact_research_state
@@ -25,115 +27,219 @@ def _extract_result_payload(result: Any) -> Any:
     return result
 
 
+def _runtime_tool_catalog() -> List[Dict[str, str]]:
+    return [
+        {
+            "name": "search_web_sources",
+            "description": "Find candidate web sources for a topic or subtopic.",
+        },
+        {
+            "name": "fetch_page",
+            "description": "Fetch and extract the contents of a specific URL.",
+        },
+        {
+            "name": "browse_page_tool",
+            "description": "Open interactive pages when normal fetch is insufficient.",
+        },
+        {
+            "name": "retrieve_evidence_chunks",
+            "description": "Select candidate evidence chunks for a claim from cited sources.",
+        },
+        {
+            "name": "verify_claim",
+            "description": "Judge whether cited sources support a claim.",
+        },
+        {
+            "name": "compact_research_state_tool",
+            "description": "Compress current research progress into durable memory.",
+        },
+        {
+            "name": "list_available_skills",
+            "description": "List project skills available to the agent.",
+        },
+        {
+            "name": "load_skill",
+            "description": "Load the instructions for a named skill.",
+        },
+    ]
+
+
+def _normalize_tool_entry(entry: Any) -> Optional[Dict[str, Any]]:
+    if hasattr(entry, "model_dump"):
+        entry = entry.model_dump(mode="json")
+    elif hasattr(entry, "__dict__") and not isinstance(entry, dict):
+        entry = {
+            key: value
+            for key, value in entry.__dict__.items()
+            if not key.startswith("_")
+        }
+
+    if isinstance(entry, str):
+        return {"name": entry, "description": ""}
+
+    if not isinstance(entry, dict):
+        return None
+
+    name = entry.get("name") or entry.get("tool_name")
+    description = entry.get("description") or entry.get("title") or entry.get("summary") or ""
+
+    if not name:
+        nested_tool = entry.get("tool")
+        if isinstance(nested_tool, dict):
+            name = nested_tool.get("name")
+            description = description or nested_tool.get("description", "")
+
+    if not name:
+        return None
+
+    normalized = {
+        "name": name,
+        "description": description,
+    }
+    if "inputSchema" in entry:
+        normalized["input_schema"] = entry["inputSchema"]
+    elif "input_schema" in entry:
+        normalized["input_schema"] = entry["input_schema"]
+    return normalized
+
+
+def _normalize_tool_search_payload(payload: Any) -> List[Dict[str, Any]]:
+    if hasattr(payload, "model_dump"):
+        payload = payload.model_dump(mode="json")
+
+    if isinstance(payload, dict):
+        if "results" in payload and isinstance(payload["results"], list):
+            payload = payload["results"]
+        elif "tools" in payload and isinstance(payload["tools"], list):
+            payload = payload["tools"]
+
+    if not isinstance(payload, list):
+        return []
+
+    normalized: List[Dict[str, Any]] = []
+    seen_names = set()
+    for item in payload:
+        entry = _normalize_tool_entry(item)
+        if not entry:
+            continue
+        name = entry["name"]
+        if name in seen_names:
+            continue
+        seen_names.add(name)
+        normalized.append(entry)
+    return normalized
+
+
 async def _call_remote_tool(tool_name: str, arguments: Dict[str, Any]) -> Any:
     server_url = _mcp_server_url()
     if not server_url or Client is None:
         raise RuntimeError("Remote MCP client unavailable.")
 
-    async with Client(server_url) as client:
-        result = await client.call_tool(tool_name, arguments)
+    with logfire.span(
+        "mcp.remote_tool_call",
+        tool_name=tool_name,
+        server_url=server_url,
+        argument_keys=sorted(arguments.keys()),
+    ):
+        async with Client(server_url) as client:
+            result = await client.call_tool(tool_name, arguments)
     return _extract_result_payload(result)
 
 
 async def search_runtime_tools_via_mcp_or_local(query: str) -> Dict[str, Any]:
     try:
-        payload = await _call_remote_tool("search_tools", {"query": query})
-        return {"query": query, "results": payload}
+        with logfire.span("runtime_tool_discovery", query=query, transport="mcp"):
+            payload = await _call_remote_tool("search_tools", {"query": query})
+        normalized = _normalize_tool_search_payload(payload)
+        if normalized:
+            return {"query": query, "results": normalized}
     except Exception:
-        return {
-            "query": query,
-            "results": [
-                {
-                    "name": "search_web_sources",
-                    "description": "Find candidate web sources for a topic or subtopic.",
-                },
-                {
-                    "name": "fetch_page",
-                    "description": "Fetch and extract the contents of a specific URL.",
-                },
-                {
-                    "name": "browse_page_tool",
-                    "description": "Open interactive pages when normal fetch is insufficient.",
-                },
-                {
-                    "name": "retrieve_evidence_chunks",
-                    "description": "Select candidate evidence chunks for a claim from cited sources.",
-                },
-                {
-                    "name": "verify_claim",
-                    "description": "Judge whether cited sources support a claim.",
-                },
-                {
-                    "name": "compact_research_state_tool",
-                    "description": "Compress current research progress into durable memory.",
-                },
-                {
-                    "name": "list_available_skills",
-                    "description": "List project skills available to the agent.",
-                },
-                {
-                    "name": "load_skill",
-                    "description": "Load the instructions for a named skill.",
-                },
-            ],
-        }
+        with logfire.span("runtime_tool_discovery", query=query, transport="local-fallback"):
+            pass
+    return {"query": query, "results": _runtime_tool_catalog()}
 
 
 async def call_runtime_tool_via_mcp_or_local(name: str, arguments: Dict[str, Any]) -> Any:
+    normalized_arguments = dict(arguments)
+    if name == "load_skill" and "skill_name" not in normalized_arguments:
+        alias_value = normalized_arguments.get("name") or normalized_arguments.get("skill")
+        if isinstance(alias_value, str) and alias_value:
+            normalized_arguments["skill_name"] = alias_value
+    if name == "load_skill":
+        normalized_arguments = {
+            "skill_name": normalized_arguments["skill_name"]
+        }
+
     try:
-        return await _call_remote_tool("call_tool", {"name": name, "arguments": arguments})
+        with logfire.span(
+            "runtime_tool_call",
+            tool_name=name,
+            transport="mcp",
+            argument_keys=sorted(normalized_arguments.keys()),
+        ):
+            return await _call_remote_tool("call_tool", {"name": name, "arguments": normalized_arguments})
     except Exception:
+        with logfire.span(
+            "runtime_tool_call",
+            tool_name=name,
+            transport="local-fallback",
+            argument_keys=sorted(normalized_arguments.keys()),
+        ):
+            pass
         if name == "search_web_sources":
-            results = search_web(query=arguments["query"], max_results=arguments.get("max_results", 5))
+            results = search_web(query=normalized_arguments["query"], max_results=normalized_arguments.get("max_results", 5))
             return {
-                "query": arguments["query"],
+                "query": normalized_arguments["query"],
                 "results": [result.model_dump(mode="json") for result in results],
             }
         if name == "fetch_page":
-            return (await fetch_url(arguments["url"])).model_dump(mode="json")
+            return (await fetch_url(normalized_arguments["url"])).model_dump(mode="json")
         if name == "browse_page_tool":
-            return (await browse_page(url=arguments["url"], goal=arguments.get("goal"))).model_dump(mode="json")
+            return (await browse_page(url=normalized_arguments["url"], goal=normalized_arguments.get("goal"))).model_dump(mode="json")
         if name == "retrieve_evidence_chunks":
             chunks = await retrieve_evidence_chunks(
-                claim=arguments["claim"],
-                source_urls=arguments["source_urls"],
+                claim=normalized_arguments["claim"],
+                source_urls=normalized_arguments["source_urls"],
             )
-            return {"claim": arguments["claim"], "chunks": [chunk.model_dump(mode="json") for chunk in chunks]}
+            return {"claim": normalized_arguments["claim"], "chunks": [chunk.model_dump(mode="json") for chunk in chunks]}
         if name == "verify_claim":
             return (
                 await verify_claim_support(
-                    claim=arguments["claim"],
-                    source_urls=arguments["source_urls"],
+                    claim=normalized_arguments["claim"],
+                    source_urls=normalized_arguments["source_urls"],
                 )
             ).model_dump(mode="json")
         if name == "compact_research_state_tool":
             ledger = await compact_research_state(
-                mission=arguments.get("mission"),
-                search_queries=arguments.get("search_queries", []),
-                fetched_pages=[ExtractedPage.model_validate(page) for page in arguments.get("fetched_pages", [])],
+                mission=normalized_arguments.get("mission"),
+                search_queries=normalized_arguments.get("search_queries", []),
+                fetched_pages=[ExtractedPage.model_validate(page) for page in normalized_arguments.get("fetched_pages", [])],
                 verification_results=[
                     ClaimSupportResult.model_validate(result)
-                    for result in arguments.get("verification_results", [])
+                    for result in normalized_arguments.get("verification_results", [])
                 ],
                 finding_artifacts=[
                     ResearchFindingArtifact.model_validate(artifact)
-                    for artifact in arguments.get("finding_artifacts", [])
+                    for artifact in normalized_arguments.get("finding_artifacts", [])
                 ],
                 existing_ledger=(
-                    ResearchLedger.model_validate(arguments["existing_ledger"])
-                    if arguments.get("existing_ledger")
+                    ResearchLedger.model_validate(normalized_arguments["existing_ledger"])
+                    if normalized_arguments.get("existing_ledger")
                     else None
                 ),
             )
             return ledger.model_dump(mode="json")
         if name == "summarize_claim_support":
             return await summarize_claim_support_via_mcp_or_local(
-                [ClaimSupportResult.model_validate(result) for result in arguments.get("verification_results", [])]
+                [ClaimSupportResult.model_validate(result) for result in normalized_arguments.get("verification_results", [])]
             )
         if name == "list_available_skills":
+            logfire.info("runtime skill catalog requested", skill_count=len(list_project_skills()))
             return {"skills": list_project_skills()}
         if name == "load_skill":
-            return {"skill_name": arguments["skill_name"], "content": load_project_skill(arguments["skill_name"])}
+            skill_name = normalized_arguments["skill_name"]
+            logfire.info("runtime skill loaded", skill_name=skill_name)
+            return {"skill_name": skill_name, "content": load_project_skill(skill_name)}
         raise RuntimeError(f"Unsupported runtime tool fallback: {name}")
 
 

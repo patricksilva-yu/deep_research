@@ -57,6 +57,7 @@ services:
     volumes:
       - ${HOME}/.codex/skills:/root/.codex/skills:ro
       - ${HOME}/.agents/skills:/root/.agents/skills:ro
+      - ./.agents/skills:/app/.agents/skills:ro
       - ./app.py:/app/app.py
       - ./auth:/app/auth
       - ./api:/app/api
@@ -97,6 +98,7 @@ services:
     volumes:
       - ${HOME}/.codex/skills:/root/.codex/skills:ro
       - ${HOME}/.agents/skills:/root/.agents/skills:ro
+      - ./.agents/skills:/app/.agents/skills:ro
       - ./api:/app/api
       - ./mcp_servers:/app/mcp_servers
       - ./skills:/app/skills

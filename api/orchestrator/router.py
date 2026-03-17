@@ -14,6 +14,7 @@ from api.files.service import save_file, load_file_content
 from api.files.db import insert_file, update_file_status, insert_vector_store
 from api.files.vector_store_service import upload_file_to_openai, create_vector_store
 from api.orchestrator.agent import create_research_agent, research_agent
+from api.research_runtime.models import FinalReport
 from api.research_runtime.models import ResearchSessionState
 import logging
 
@@ -152,6 +153,16 @@ async def create_plan(
             result = await research_agent.run(user_prompt, deps=state)
 
         output = result.output  # OrchestratorOutput with plan and final_report
+        if output.final_report is None:
+            generated_report = state.artifacts.get("generated_report")
+            if generated_report:
+                try:
+                    output = OrchestratorOutput(
+                        plan=output.plan,
+                        final_report=FinalReport.model_validate(generated_report),
+                    )
+                except Exception:
+                    logger.warning("Generated report artifact was present but invalid", exc_info=True)
 
         # 7. Save assistant response with full metadata
         display_content = (
